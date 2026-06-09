@@ -1,18 +1,19 @@
 package com.nabd.ai.local.ui
 
+import androidx.compose.animation.animateContentSize
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.PlayArrow
-import androidx.compose.material.icons.filled.Send
-import androidx.compose.material.icons.filled.Stop
+import androidx.compose.material.icons.filled.*
 import androidx.compose.material3.*
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
@@ -99,45 +100,115 @@ fun MessageList(
         contentPadding = PaddingValues(vertical = 16.dp)
     ) {
         items(messages, key = { it.id }) { message ->
-            MessageBubble(message)
+            NabdMessageBubble(message)
         }
     }
 }
 
 @Composable
-fun MessageBubble(message: ChatMessage) {
-    val alignment = if (message.isUser) Alignment.CenterEnd else Alignment.CenterStart
-    val color = if (message.isUser) MaterialTheme.colorScheme.primaryContainer else MaterialTheme.colorScheme.secondaryContainer
+fun NabdMessageBubble(message: ChatMessage) {
+    val isUser = message.isUser
+    val alignment = if (isUser) Alignment.CenterEnd else Alignment.CenterStart
+    
+    // Agora-inspired Bubble Colors
+    val bubbleColor = if (isUser) {
+        MaterialTheme.colorScheme.primaryContainer
+    } else {
+        MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.7f)
+    }
+
+    val contentColor = if (isUser) {
+        MaterialTheme.colorScheme.onPrimaryContainer
+    } else {
+        MaterialTheme.colorScheme.onSurfaceVariant
+    }
 
     Column(
-        modifier = Modifier.fillMaxWidth(),
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(vertical = 4.dp),
         horizontalAlignment = alignment
     ) {
-        Surface(
-            color = color,
-            shape = RoundedCornerShape(12.dp),
-            modifier = Modifier.widthIn(max = 300.dp)
+        Row(
+            verticalAlignment = Alignment.Bottom,
+            horizontalArrangement = if (isUser) Arrangement.End else Arrangement.Start,
+            modifier = Modifier.fillMaxWidth(0.9f)
         ) {
-            Column(modifier = Modifier.padding(12.dp)) {
-                Text(
-                    text = if (message.isUser) "You" else "Nabd",
-                    style = MaterialTheme.typography.labelSmall,
-                    fontWeight = FontWeight.Bold
-                )
-                Text(
-                    text = message.text,
-                    style = MaterialTheme.typography.bodyMedium
-                )
-                if (message.isPending) {
-                    LinearProgressIndicator(
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .padding(top = 4.dp),
-                        color = MaterialTheme.colorScheme.primary
+            if (!isUser) {
+                AvatarIcon(isUser = false)
+                Spacer(modifier = Modifier.width(8.dp))
+            }
+
+            Surface(
+                color = bubbleColor,
+                contentColor = contentColor,
+                shape = RoundedCornerShape(
+                    topStart = 16.dp,
+                    topEnd = 16.dp,
+                    bottomStart = if (isUser) 16.dp else 4.dp,
+                    bottomEnd = if (isUser) 4.dp else 16.dp
+                ),
+                tonalElevation = 1.dp,
+                modifier = Modifier.animateContentSize()
+            ) {
+                Column(modifier = Modifier.padding(12.dp)) {
+                    if (!isUser) {
+                        Text(
+                            text = "Nabd Agent",
+                            style = MaterialTheme.typography.labelSmall,
+                            color = MaterialTheme.colorScheme.primary,
+                            fontWeight = FontWeight.Bold,
+                            modifier = Modifier.padding(bottom = 4.dp)
+                        )
+                    }
+
+                    Text(
+                        text = message.text,
+                        style = MaterialTheme.typography.bodyMedium,
+                        lineHeight = 20.sp
                     )
+
+                    if (message.isPending) {
+                        Spacer(modifier = Modifier.height(8.dp))
+                        LinearProgressIndicator(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .height(2.dp)
+                                .clip(CircleShape),
+                            color = MaterialTheme.colorScheme.primary,
+                            trackColor = MaterialTheme.colorScheme.primary.copy(alpha = 0.2f)
+                        )
+                    }
                 }
             }
+
+            if (isUser) {
+                Spacer(modifier = Modifier.width(8.dp))
+                AvatarIcon(isUser = true)
+            }
         }
+    }
+}
+
+@Composable
+fun AvatarIcon(isUser: Boolean) {
+    Box(
+        modifier = Modifier
+            .size(32.dp)
+            .clip(CircleShape)
+            .background(
+                if (isUser) MaterialTheme.colorScheme.secondaryContainer 
+                else MaterialTheme.colorScheme.tertiaryContainer
+            ),
+        contentAlignment = Alignment.Center
+    ) {
+        Icon(
+            imageVector = if (isUser) Icons.Default.Psychology else Icons.Default.SmartToy,
+            contentDescription = null,
+            modifier = Modifier.size(20.dp),
+            tint = if (isUser) MaterialTheme.colorScheme.onSecondaryContainer 
+                   else MaterialTheme.colorScheme.onTertiaryContainer
+        )
     }
 }
 

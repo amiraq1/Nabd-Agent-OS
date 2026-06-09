@@ -22,5 +22,6 @@ data class ChatMessage(
     val id: String = UUID.randomUUID().toString(),
     val text: String,
     val isUser: Boolean,
-    val isPending: Boolean = false
+    val isPending: Boolean = false,
+    val thoughts: String? = null
 )

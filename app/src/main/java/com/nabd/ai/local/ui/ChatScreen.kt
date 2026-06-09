@@ -153,76 +153,81 @@ fun NabdMessageBubble(message: ChatMessage) {
     val bubbleColor = if (isUser) {
         MaterialTheme.colorScheme.primaryContainer
     } else {
-        MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.7f)
-    }
-
-    val contentColor = if (isUser) {
-        MaterialTheme.colorScheme.onPrimaryContainer
-    } else {
-        MaterialTheme.colorScheme.onSurfaceVariant
+        MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f)
     }
 
     Column(
         modifier = Modifier
             .fillMaxWidth()
-            .padding(vertical = 4.dp),
+            .padding(vertical = 6.dp),
         horizontalAlignment = alignment
     ) {
         Row(
             verticalAlignment = Alignment.Bottom,
             horizontalArrangement = if (isUser) Arrangement.End else Arrangement.Start,
-            modifier = Modifier.fillMaxWidth(0.9f)
+            modifier = Modifier.fillMaxWidth(0.92f)
         ) {
             if (!isUser) {
                 AvatarIcon(isUser = false)
-                Spacer(modifier = Modifier.width(8.dp))
+                Spacer(modifier = Modifier.width(10.dp))
             }
 
-            Surface(
-                color = bubbleColor,
-                contentColor = contentColor,
-                shape = RoundedCornerShape(
-                    topStart = 16.dp,
-                    topEnd = 16.dp,
-                    bottomStart = if (isUser) 16.dp else 4.dp,
-                    bottomEnd = if (isUser) 4.dp else 16.dp
-                ),
-                tonalElevation = 1.dp,
-                modifier = Modifier.animateContentSize()
-            ) {
-                Column(modifier = Modifier.padding(12.dp)) {
-                    if (!isUser) {
-                        Text(
-                            text = "Nabd Agent",
-                            style = MaterialTheme.typography.labelSmall,
-                            color = MaterialTheme.colorScheme.primary,
-                            fontWeight = FontWeight.Bold,
-                            modifier = Modifier.padding(bottom = 4.dp)
-                        )
-                    }
-
-                    Text(
-                        text = message.text,
-                        style = MaterialTheme.typography.bodyMedium,
-                        lineHeight = 20.sp
+            Column(modifier = Modifier.weight(1f, fill = false)) {
+                // Thinking View Integration (Agora Style)
+                if (!isUser && !message.thoughts.isNullOrBlank()) {
+                    ThinkingAccordion(
+                        thought = message.thoughts,
+                        title = "Agent Logic & Planning",
+                        initialExpanded = message.isPending // Expand by default while generating
                     )
+                    Spacer(modifier = Modifier.height(4.dp))
+                }
 
-                    if (message.isPending) {
-                        Spacer(modifier = Modifier.height(8.dp))
-                        LinearProgressIndicator(
-                            modifier = Modifier
-                                .fillMaxWidth()
-                                .height(2.dp)
-                                .clip(CircleShape),
-                            color = MaterialTheme.colorScheme.primary,
-                            trackColor = MaterialTheme.colorScheme.primary.copy(alpha = 0.2f)
+                Surface(
+                    color = bubbleColor,
+                    shape = RoundedCornerShape(
+                        topStart = 18.dp,
+                        topEnd = 18.dp,
+                        bottomStart = if (isUser) 18.dp else 4.dp,
+                        bottomEnd = if (isUser) 4.dp else 18.dp
+                    ),
+                    tonalElevation = if (isUser) 2.dp else 0.dp,
+                    modifier = Modifier.animateContentSize()
+                ) {
+                    Column(modifier = Modifier.padding(14.dp)) {
+                        if (!isUser) {
+                            Text(
+                                text = "NABD AI",
+                                style = MaterialTheme.typography.labelSmall,
+                                color = MaterialTheme.colorScheme.primary,
+                                fontWeight = FontWeight.ExtraBold,
+                                modifier = Modifier.padding(bottom = 6.dp)
+                            )
+                        }
+
+                        // Main Response Text
+                        Text(
+                            text = message.text,
+                            style = MaterialTheme.typography.bodyMedium,
+                            lineHeight = 22.sp,
+                            color = if (isUser) MaterialTheme.colorScheme.onPrimaryContainer 
+                                    else MaterialTheme.colorScheme.onSurfaceVariant
                         )
+
+                        if (message.isPending) {
+                            Spacer(modifier = Modifier.height(10.dp))
+                            LinearProgressIndicator(
+                                modifier = Modifier.fillMaxWidth().height(2.dp).clip(CircleShape),
+                                color = MaterialTheme.colorScheme.primary,
+                                trackColor = MaterialTheme.colorScheme.primary.copy(alpha = 0.1f)
+                            )
+                        }
                     }
                 }
             }
 
             if (isUser) {
-                Spacer(modifier = Modifier.width(8.dp))
+                Spacer(modifier = Modifier.width(10.dp))
                 AvatarIcon(isUser = true)
             }
         }

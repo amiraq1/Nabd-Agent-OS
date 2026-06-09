@@ -28,17 +28,19 @@ jobs:
         [ -f app/src/main/cpp/third_party/llama.cpp/CMakeLists.txt ] || exit 1
 
     - name: Build Debug APK
-      run: ./gradlew assembleDebug --no-daemon --stacktrace --info
-      env:
-        GRADLE_OPTS: -Dorg.gradle.jvmargs="-Xmx4096m -XX:MaxMetaspaceSize=1024m"
+      run: ./gradlew :app:assembleDebug --stacktrace --info
 
     - name: Debug on Failure
       if: failure()
       run: |
-        echo "Listing build directory contents..."
-        find . -name "build.log" || true
-        find . -name "*.apk" || true
+        echo "=== PROJECT STRUCTURE ==="
+        find . -maxdepth 3 -not -path '*/.*'
+        echo "=== ANDROID HOME ==="
+        echo $ANDROID_HOME
+        echo "=== NDK HOME ==="
+        echo $ANDROID_NDK_HOME
         ls -R app/build/reports || true
+
 
     - name: Upload APK Artifact
       uses: actions/upload-artifact@v4

@@ -23,8 +23,8 @@ android {
 
         externalNativeBuild {
             cmake {
-                cppFlags("-std=c++17")
-                abiFilters("arm64-v8a")
+                cppFlags += "-std=c++17"
+                abiFilters += "arm64-v8a"
             }
         }
     }
@@ -49,8 +49,9 @@ android {
     buildFeatures {
         compose = true
     }
+    
     composeOptions {
-        kotlinCompilerExtensionVersion = "1.5.8"
+        kotlinCompilerExtensionVersion = "1.5.4"
     }
     packaging {
         resources {

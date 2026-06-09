@@ -70,4 +70,12 @@ Java_com_nabd_ai_local_engine_LlamaEngine_nativeRelease(JNIEnv* env, jobject thi
     delete context;
 }
 
+JNIEXPORT jstring JNICALL
+Java_com_nabd_ai_local_engine_NabdEngine_stringFromJNI(
+        JNIEnv* env,
+        jobject /* this */) {
+    std::string hello = "Nabd Native Engine Active";
+    return env->NewStringUTF(hello.c_str());
+}
+
 } // extern "C"

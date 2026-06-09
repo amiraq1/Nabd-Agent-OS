@@ -1,0 +1,37 @@
+build:
+  maxIssues: 0
+
+config:
+  validation: true
+
+formatting:
+  active: true
+  NoEmptyClassBody:
+    active: true
+
+complexity:
+  active: true
+  TooManyFunctions:
+    active: true
+    thresholdInFiles: 15
+    thresholdInClasses: 15
+    thresholdInInterfaces: 15
+    thresholdInObjects: 15
+    thresholdInEnums: 15
+    ignoreDeprecated: false
+    ignoreOverridden: false
+  ComplexCondition:
+    active: true
+    threshold: 4
+  ComplexMethod:
+    active: true
+    threshold: 15
+
+style:
+  active: true
+  MagicNumber:
+    active: false
+  ReturnCount:
+    active: true
+    max: 4
+    excludeGuardClauses: true

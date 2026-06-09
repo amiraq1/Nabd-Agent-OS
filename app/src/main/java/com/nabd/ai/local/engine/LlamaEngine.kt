@@ -1,0 +1,111 @@
+package com.nabd.ai.local.engine
+
+import kotlinx.coroutines.channels.awaitClose
+import kotlinx.coroutines.flow.*
+import kotlinx.coroutines.sync.Mutex
+import kotlinx.coroutines.sync.withLock
+import android.util.Log
+
+/**
+ * LlamaEngine: Implementation of [LlmProvider] using llama.cpp.
+ * Uses explicit JNI bindings to interact with the native C++ runtime.
+ */
+class LlamaEngine : LlmProvider {
+
+    private val _state = MutableStateFlow<EngineState>(EngineState.Initialized)
+    override val state: StateFlow<EngineState> = _state.asStateFlow()
+
+    private val mutex = Mutex()
+    private var nativeContextHandle: Long = 0
+
+    init {
+        System.loadLibrary("nabd_engine")
+        nativeContextHandle = nativeInit()
+    }
+
+    override suspend fun loadModel(modelPath: String) = mutex.withLock {
+        if (_state.value !is EngineState.Initialized && _state.value !is EngineState.Unloaded) {
+            throw IllegalStateException("Cannot load model from state: ${_state.value}")
+        }
+
+        _state.value = EngineState.Loading
+        val success = nativeLoadModel(nativeContextHandle, modelPath)
+        
+        if (success) {
+            _state.value = EngineState.Loaded
+        } else {
+            _state.value = EngineState.Failed("Failed to load model at $modelPath")
+        }
+    }
+
+    override fun generateText(prompt: String, grammar: String?): Flow<String> = callbackFlow {
+        if (_state.value !is EngineState.Loaded) {
+            throw IllegalStateException("Model must be loaded before generation")
+        }
+
+        _state.value = EngineState.Generating
+
+        val callback = object : TokenCallback {
+            override fun onToken(token: String) {
+                trySend(token)
+            }
+
+            override fun onCompletion() {
+                _state.value = EngineState.Loaded
+                close()
+            }
+
+            override fun onError(error: String) {
+                _state.value = EngineState.Failed(error)
+                close(RuntimeException(error))
+            }
+        }
+
+        nativeGenerate(nativeContextHandle, prompt, grammar ?: "", callback)
+
+        awaitClose {
+            stopGeneration()
+        }
+    }.flowOn(kotlinx.coroutines.Dispatchers.IO)
+
+    override fun stopGeneration() {
+        if (_state.value is EngineState.Generating) {
+            _state.value = EngineState.Stopping
+            nativeStopGeneration(nativeContextHandle)
+            _state.value = EngineState.Loaded
+        }
+    }
+
+    override fun unloadModel() {
+        if (nativeContextHandle != 0L) {
+            nativeUnloadModel(nativeContextHandle)
+            _state.value = EngineState.Unloaded
+        }
+    }
+
+    protected fun finalize() {
+        if (nativeContextHandle != 0L) {
+            nativeRelease(nativeContextHandle)
+            nativeContextHandle = 0L
+        }
+    }
+
+    // --- Native JNI Methods ---
+
+    private external fun nativeInit(): Long
+    private external fun nativeLoadModel(handle: Long, path: String): Boolean
+    private external fun nativeGenerate(handle: Long, prompt: String, grammar: String, callback: TokenCallback)
+    private external fun nativeStopGeneration(handle: Long)
+    private external fun nativeUnloadModel(handle: Long)
+    private external fun nativeRelease(handle: Long)
+
+    /**
+     * Internal interface for JNI to call back into Kotlin.
+     * This is the only boundary where JNI interacts with Kotlin objects.
+     */
+    interface TokenCallback {
+        fun onToken(token: String)
+        fun onCompletion()
+        fun onError(error: String)
+    }
+}

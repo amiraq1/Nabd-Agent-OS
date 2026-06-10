@@ -53,3 +53,7 @@ target_include_directories(
     ${CMAKE_CURRENT_SOURCE_DIR}
     third_party/llama.cpp/include
 )
+
+# تفعيل الاستثناءات لمكتبتنا فقط لتجاوز إعدادات llama.cpp الصارمة
+target_compile_options(nabd_engine PRIVATE -fexceptions)
+

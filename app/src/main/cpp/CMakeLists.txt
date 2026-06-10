@@ -8,7 +8,7 @@ set(CMAKE_CXX_STANDARD_REQUIRED ON)
 
 # Optimization flags for Android ARM64
 if(CMAKE_SYSTEM_PROCESSOR STREQUAL "aarch64")
-    add_compile_options(-O3 -ffast-math -fno-exceptions -fno-rtti)
+    add_compile_options(-O3 -fexceptions)
 endif()
 
 # llama.cpp options

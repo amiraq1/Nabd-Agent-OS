@@ -14,7 +14,6 @@ class ExecutionGuardrails(
 
     fun recordStep() {
         currentSteps++
-        consecutiveFailures = 0 // Reset on step progression (assuming recordStep is on success or attempt, but we increment failures explicitly)
     }
 
     fun recordFailure() {

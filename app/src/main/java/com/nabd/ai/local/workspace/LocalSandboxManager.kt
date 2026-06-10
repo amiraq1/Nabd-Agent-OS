@@ -14,6 +14,9 @@ class LocalSandboxManager(
     }
 
     override fun resolvePath(relativePath: String): File {
+        if (relativePath.contains("..")) {
+            throw SecurityException("Path traversal attempt detected: $relativePath")
+        }
         val targetFile = File(workspaceRoot, relativePath)
         validatePath(targetFile)
         return targetFile

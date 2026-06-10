@@ -20,7 +20,7 @@ class ReplanningManager {
                 requiredTools = correction.newToolsRequired,
                 dependencies = if (index == 0) emptyList() else listOf("corr_${index-1}") // Simplified linking
             )
-        }
+        }.toMutableList()
 
         // Link new steps sequentially
         for (i in 1 until newSteps.size) {

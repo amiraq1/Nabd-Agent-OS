@@ -45,7 +45,17 @@ class SettingsViewModel(
         settingsRepository.activeModelName
             .onEach { name -> _uiState.update { it.copy(activeModelName = name) } }
             .launchIn(viewModelScope)
-...
+
+        modelManager.importState
+            .onEach { state -> 
+                _uiState.update { it.copy(importState = state) }
+                if (state is ModelImportState.Completed) {
+                    refreshModels()
+                }
+            }
+            .launchIn(viewModelScope)
+    }
+
     fun importDocument(uri: Uri, title: String) {
         viewModelScope.launch {
             ingestionManager?.ingestDocument(uri, title)
@@ -56,19 +66,6 @@ class SettingsViewModel(
         viewModelScope.launch {
             ingestionManager?.deleteDocument(id)
         }
-    }
-
-    private fun refreshModels() {
-...
-
-        modelManager.importState
-            .onEach { state -> 
-                _uiState.update { it.copy(importState = state) }
-                if (state is ModelImportState.Completed) {
-                    refreshModels()
-                }
-            }
-            .launchIn(viewModelScope)
     }
 
     fun importModel(uri: Uri) {

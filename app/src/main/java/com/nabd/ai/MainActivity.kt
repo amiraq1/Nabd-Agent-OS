@@ -157,9 +157,7 @@ class MainActivity : ComponentActivity() {
                     semanticRetriever,
                     knowledgeRetriever,
                     knowledgeIngestionManager,
-                    database,
-                    autonomousAgentRunner,
-                    executionTimeline
+                    database
                 )
             }
         }
@@ -187,3 +185,25 @@ fun MainApp(
             NavigationBar {
                 NavigationBarItem(
                     selected = currentScreen == "chat",
+                    onClick = { currentScreen = "chat" },
+                    icon = { Icon(Icons.Default.Check, contentDescription = "Chat") },
+                    label = { Text("Chat") }
+                )
+                NavigationBarItem(
+                    selected = currentScreen == "settings",
+                    onClick = { currentScreen = "settings" },
+                    icon = { Icon(Icons.Default.Settings, contentDescription = "Settings") },
+                    label = { Text("Settings") }
+                )
+            }
+        }
+    ) { paddingValues ->
+        Surface(modifier = Modifier.padding(paddingValues).fillMaxSize()) {
+            if (currentScreen == "chat") {
+                ChatScreen(chatViewModel)
+            } else {
+                SettingsScreen(settingsViewModel)
+            }
+        }
+    }
+}

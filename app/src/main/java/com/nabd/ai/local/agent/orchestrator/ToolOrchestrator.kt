@@ -79,8 +79,12 @@ class ToolOrchestrator(
 
                     val observation = dispatchTool(toolCall.tool, JSONObject(toolCall.parameters).toString())
                     
-                    // Allow the loop to continue with the error as an observation so the LLM can recover
-                    currentContext += "\n\nTool Call: ${'$'}generatedJson\nObservation: ${'$'}observation\n\nNext Action:"
+                    val trimmedObservation = if (observation.length > 2000) observation.substring(0, 1997) + "..." else observation
+                    currentContext += "\n\nTool Call: ${'$'}generatedJson\nObservation: ${'$'}trimmedObservation\n\nNext Action:"
+                    
+                    if (currentContext.length > 8000) {
+                        currentContext = currentContext.substring(currentContext.length - 8000)
+                    }
                 }
                 is ToolCallResult.Error -> {
                     addTrace(TraceType.ERROR, "Parse error: ${'$'}{parseResult.reason}")
@@ -151,7 +155,10 @@ class ToolOrchestrator(
 
     private suspend fun waitOnApproval(): Boolean {
         approvalDeferred = CompletableDeferred()
-        return approvalDeferred!!.await()
+        val result = kotlinx.coroutines.withTimeoutOrNull(300_000L) {
+            approvalDeferred!!.await()
+        }
+        return result ?: false
     }
 
     private fun addTrace(type: TraceType, content: String) {

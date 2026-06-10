@@ -4,6 +4,8 @@ import java.util.UUID
 
 enum class EventType {
     PLAN_CREATED,
+    PLAN_COMPLETED,
+    PLAN_FAILED,
     STEP_STARTED,
     STEP_COMPLETED,
     STEP_FAILED,

@@ -149,10 +149,10 @@ class AutonomousAgentRunner(
 
         if (plan.isCompleted) {
             _state.value = AutonomousExecutionState.COMPLETED
-            timeline.addEvent(EventType.PLAN_CREATED, "Goal completed successfully.")
+            timeline.addEvent(EventType.PLAN_COMPLETED, "Goal completed successfully.")
         } else if (plan.isFailed) {
             _state.value = AutonomousExecutionState.FAILED
-            timeline.addEvent(EventType.PLAN_CREATED, "Goal failed.")
+            timeline.addEvent(EventType.PLAN_FAILED, "Goal failed.")
         }
         
         sessionManager.save()

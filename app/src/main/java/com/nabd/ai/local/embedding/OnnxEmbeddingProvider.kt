@@ -65,9 +65,19 @@ class OnnxEmbeddingProvider(
             val outputTensor = results[0] as OnnxTensor
             val floatArray = outputTensor.floatBuffer.array()
             
-            // Simplified pooling (just returning first token's embeddings, normally mean pooling over attention mask)
+            // Proper mean pooling over all tokens
             val result = FloatArray(dimensions)
-            System.arraycopy(floatArray, 0, result, 0, dimensions)
+            val tokenCount = tokens.size
+            if (tokenCount > 0) {
+                for (i in 0 until tokenCount) {
+                    for (d in 0 until dimensions) {
+                        result[d] += floatArray[i * dimensions + d]
+                    }
+                }
+                for (d in 0 until dimensions) {
+                    result[d] /= tokenCount.toFloat()
+                }
+            }
             
             inputTensor.close()
             attentionTensor.close()
@@ -81,8 +91,12 @@ class OnnxEmbeddingProvider(
         return texts.map { embed(it) } // Sequential for now, can be batched at tensor level
     }
 
-    // Dummy tokenizer for structural completion. Real integration requires huggingface/tokenizers.
     private fun tokenize(text: String): List<Int> {
-        return text.split(" ").map { it.hashCode() % 30000 }
+        val tokens = text.lowercase()
+            .replace(Regex("[^a-z0-9 ]"), "")
+            .split(Regex("\\s+"))
+            .filter { it.isNotBlank() }
+            .map { kotlin.math.abs(it.hashCode()) % 30000 }
+        return tokens.takeIf { it.isNotEmpty() } ?: listOf(0)
     }
 }

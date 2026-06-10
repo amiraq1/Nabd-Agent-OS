@@ -10,7 +10,7 @@ import android.util.Log
  * LlamaEngine: Implementation of [LlmProvider] using llama.cpp.
  * Uses explicit JNI bindings to interact with the native C++ runtime.
  */
-class LlamaEngine : LlmProvider {
+class LlamaEngine : LlmProvider, java.io.Closeable {
 
     private val _state = MutableStateFlow<EngineState>(EngineState.Initialized)
     override val state: StateFlow<EngineState> = _state.asStateFlow()
@@ -19,8 +19,13 @@ class LlamaEngine : LlmProvider {
     private var nativeContextHandle: Long = 0
 
     init {
-        System.loadLibrary("nabd_engine")
-        nativeContextHandle = nativeInit()
+        try {
+            System.loadLibrary("nabd_engine")
+            nativeContextHandle = nativeInit()
+        } catch (e: UnsatisfiedLinkError) {
+            Log.e("LlamaEngine", "Failed to load native library", e)
+            _state.value = EngineState.Failed("Native library load failed")
+        }
     }
 
     override suspend fun loadModel(modelPath: String) = mutex.withLock {
@@ -69,10 +74,12 @@ class LlamaEngine : LlmProvider {
     }.flowOn(kotlinx.coroutines.Dispatchers.IO)
 
     override fun stopGeneration() {
-        if (_state.value is EngineState.Generating) {
-            _state.value = EngineState.Stopping
-            nativeStopGeneration(nativeContextHandle)
-            _state.value = EngineState.Loaded
+        synchronized(this) {
+            if (_state.value is EngineState.Generating) {
+                _state.value = EngineState.Stopping
+                nativeStopGeneration(nativeContextHandle)
+                _state.value = EngineState.Loaded
+            }
         }
     }
 
@@ -83,7 +90,7 @@ class LlamaEngine : LlmProvider {
         }
     }
 
-    protected fun finalize() {
+    override fun close() {
         if (nativeContextHandle != 0L) {
             nativeRelease(nativeContextHandle)
             nativeContextHandle = 0L

@@ -8,8 +8,8 @@ import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.ExpandMore
-import androidx.compose.material.icons.filled.Psychology
+import androidx.compose.material.icons.filled.KeyboardArrowDown
+import androidx.compose.material.icons.filled.Face
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
@@ -51,7 +51,7 @@ fun ThinkingAccordion(
                 verticalAlignment = Alignment.CenterVertically
             ) {
                 Icon(
-                    imageVector = Icons.Default.Psychology,
+                    imageVector = Icons.Default.Face,
                     contentDescription = null,
                     tint = MaterialTheme.colorScheme.primary,
                     modifier = Modifier.size(18.dp)
@@ -65,7 +65,7 @@ fun ThinkingAccordion(
                     modifier = Modifier.weight(1f)
                 )
                 Icon(
-                    imageVector = Icons.Default.ExpandMore,
+                    imageVector = Icons.Default.KeyboardArrowDown,
                     contentDescription = null,
                     tint = MaterialTheme.colorScheme.onSurfaceVariant,
                     modifier = Modifier
@@ -80,7 +80,7 @@ fun ThinkingAccordion(
                         .padding(start = 12.dp, end = 12.dp, bottom = 12.dp)
                         .fillMaxWidth()
                 ) {
-                    HorizontalDivider(
+                    Divider(
                         color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.1f),
                         modifier = Modifier.padding(bottom = 8.dp)
                     )

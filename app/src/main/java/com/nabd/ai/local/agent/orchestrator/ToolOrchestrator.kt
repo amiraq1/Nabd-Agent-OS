@@ -134,7 +134,7 @@ class ToolOrchestrator(
 
         return try {
             val result = tool.execute(params)
-            val observation = result.getOrElse { "Error: ${'$'}{it.message ?: "Unknown tool error"}" }
+            val observation = result.getOrElse { "Error: ${it.message ?: "Unknown tool error"}" }
             addTrace(TraceType.TOOL_RESULT, observation)
             _state.value = AgentExecutionState.Observing
             observation

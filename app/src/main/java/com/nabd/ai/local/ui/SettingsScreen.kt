@@ -117,7 +117,7 @@ fun KnowledgeTab(
         ) {
             Text(text = "Knowledge Base", style = MaterialTheme.typography.titleMedium)
             Button(onClick = { launcher.launch(arrayOf("*/*")) }) {
-                Icon(Icons.Default.UploadFile, contentDescription = null)
+                Icon(Icons.Default.AddCircle, contentDescription = null)
                 Text("Add Doc")
             }
         }

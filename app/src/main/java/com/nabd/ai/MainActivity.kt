@@ -6,6 +6,14 @@ import androidx.activity.compose.setContent
 import androidx.activity.viewModels
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.material3.MaterialTheme
+package com.nabd.ai
+
+import android.os.Bundle
+import androidx.activity.ComponentActivity
+import androidx.activity.compose.setContent
+import androidx.activity.viewModels
+import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
 import androidx.compose.foundation.layout.padding
 import androidx.compose.material.icons.Icons
@@ -18,6 +26,7 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
+import androidx.compose.ui.Modifier
 import com.nabd.ai.local.data.SettingsRepository
 import com.nabd.ai.local.domain.ModelManager
 import com.nabd.ai.local.engine.LlamaEngine
@@ -200,9 +209,18 @@ fun MainApp(
     ) { paddingValues ->
         Surface(modifier = Modifier.padding(paddingValues).fillMaxSize()) {
             if (currentScreen == "chat") {
-                ChatScreen(chatViewModel)
+                val chatUiState by chatViewModel.uiState.collectAsState()
+                ChatScreen(chatUiState, chatViewModel::onIntent)
             } else {
-                SettingsScreen(settingsViewModel)
+                val settingsUiState by settingsViewModel.uiState.collectAsState()
+                SettingsScreen(
+                    uiState = settingsUiState,
+                    onImport = settingsViewModel::importModel,
+                    onSelect = settingsViewModel::selectModel,
+                    onDelete = settingsViewModel::deleteModel,
+                    onImportDocument = settingsViewModel::importDocument,
+                    onDeleteDocument = settingsViewModel::deleteDocument
+                )
             }
         }
     }

@@ -5,6 +5,9 @@ package com.nabd.ai.local.agent
  */
 enum class ToolRiskLevel {
     SAFE,       // Read-only or idempotent operations (e.g., Time, Calculator)
+    LOW,
+    MODERATE,
+    HIGH,
     ELEVATED,   // External access (e.g., Web Search)
     DANGEROUS   // Write access or system modification (e.g., File Write, Shell)
 }

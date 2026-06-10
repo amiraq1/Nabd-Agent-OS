@@ -9,7 +9,9 @@ import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.automirrored.filled.Send
+import androidx.compose.material.icons.filled.Send
+import androidx.compose.material.icons.filled.Face
+import androidx.compose.material.icons.filled.SmartScreen
 import androidx.compose.material.icons.filled.*
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
@@ -148,7 +150,7 @@ fun EngineControls(
 @Composable
 fun NabdMessageBubble(message: ChatMessage) {
     val isUser = message.isUser
-    val alignment = if (isUser) Alignment.CenterEnd else Alignment.CenterStart
+    val alignment = if (isUser) Alignment.End else Alignment.Start
     
     val bubbleColor = if (isUser) {
         MaterialTheme.colorScheme.primaryContainer
@@ -247,7 +249,7 @@ fun AvatarIcon(isUser: Boolean) {
         contentAlignment = Alignment.Center
     ) {
         Icon(
-            imageVector = if (isUser) Icons.Default.Psychology else Icons.Default.SmartToy,
+            imageVector = if (isUser) Icons.Default.Face else Icons.Default.SmartScreen,
             contentDescription = null,
             modifier = Modifier.size(20.dp),
             tint = if (isUser) MaterialTheme.colorScheme.onSecondaryContainer 
@@ -265,7 +267,7 @@ fun NabdInputArea(
 ) {
     Surface(
         shape = RoundedCornerShape(28.dp),
-        color = MaterialTheme.colorScheme.surfaceContainerHigh,
+        color = MaterialTheme.colorScheme.surfaceVariant,
         tonalElevation = 8.dp,
         modifier = Modifier
             .fillMaxWidth()
@@ -310,7 +312,7 @@ fun NabdInputArea(
                 )
             ) {
                 Icon(
-                    Icons.AutoMirrored.Filled.Send,
+                    Icons.Default.Send,
                     contentDescription = "Send",
                     modifier = Modifier.size(24.dp)
                 )

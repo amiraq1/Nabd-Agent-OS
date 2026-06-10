@@ -8,7 +8,7 @@ plugins {
 android {
     namespace = "com.nabd.ai"
     compileSdk = 34
-    ndkVersion = "26.1.10909125"
+    ndkVersion = "26.3.11579264"
 
     defaultConfig {
         applicationId = "com.nabd.ai"

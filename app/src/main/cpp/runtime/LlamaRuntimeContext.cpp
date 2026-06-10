@@ -35,7 +35,7 @@ bool LlamaRuntimeContext::loadModel(const std::string& path) {
     LOGI("Loading model: %s", path.c_str());
 
     llama_model_params model_params = llama_model_default_params();
-    model = llama_load_model_from_file(path.c_str(), model_params);
+    model = llama_model_load_from_file(path.c_str(), model_params);
     if (!model) {
         LOGE("Failed to load model from %s", path.c_str());
         return false;

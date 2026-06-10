@@ -72,7 +72,8 @@ void LlamaRuntimeContext::generate(JNIEnv* env, const std::string& prompt, const
     // Tokenize
     std::vector<llama_token> tokens_list;
     tokens_list.resize(prompt.size() + 2);
-    int n_tokens = llama_tokenize(model, prompt.c_str(), prompt.size(), tokens_list.data(), tokens_list.size(), true, true);
+    const struct llama_vocab * vocab = llama_model_get_vocab(model);
+    int n_tokens = llama_tokenize(vocab, prompt.c_str(), prompt.size(), tokens_list.data(), tokens_list.size(), true, true);
     if (n_tokens < 0) {
         env->CallVoidMethod(callback, onErrorMethod, env->NewStringUTF("Tokenization failed"));
         is_generating = false;
@@ -93,7 +94,6 @@ void LlamaRuntimeContext::generate(JNIEnv* env, const std::string& prompt, const
     llama_sampler_chain_add(smpl, llama_sampler_init_greedy());
     
     if (!grammar.empty()) {
-        const llama_vocab* vocab = llama_model_get_vocab(model);
         struct llama_sampler* grammar_sampler = llama_sampler_init_grammar(vocab, grammar.c_str(), "root");
         if (grammar_sampler) {
             llama_sampler_chain_add(smpl, grammar_sampler);
@@ -119,13 +119,13 @@ void LlamaRuntimeContext::generate(JNIEnv* env, const std::string& prompt, const
             // Sample next token
             const llama_token new_token_id = llama_sampler_sample(smpl, ctx, batch.n_tokens - 1);
 
-            if (llama_token_is_eog(model, new_token_id)) {
+            if (llama_vocab_is_eog(vocab, new_token_id)) {
                 break;
             }
 
             // Convert token to string
             char buf[128];
-            int n = llama_token_to_piece(model, new_token_id, buf, sizeof(buf), 0, true);
+            int n = llama_token_to_piece(vocab, new_token_id, buf, sizeof(buf), 0, true);
             if (n > 0) {
                 std::string token_str(buf, n);
                 jstring jtoken = env->NewStringUTF(token_str.c_str());

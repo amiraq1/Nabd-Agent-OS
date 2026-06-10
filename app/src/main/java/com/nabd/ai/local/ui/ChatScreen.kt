@@ -24,6 +24,10 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.nabd.ai.local.engine.EngineState
+import androidx.compose.animation.core.Spring
+import androidx.compose.animation.core.spring
+import androidx.compose.foundation.border
+import androidx.compose.ui.text.font.FontFamily
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -153,34 +157,46 @@ fun NabdMessageBubble(message: ChatMessage) {
     val alignment = if (isUser) Alignment.End else Alignment.Start
     
     val bubbleColor = if (isUser) {
-        MaterialTheme.colorScheme.primaryContainer
+        MaterialTheme.colorScheme.primary.copy(alpha = 0.05f)
     } else {
-        MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f)
+        MaterialTheme.colorScheme.surface
+    }
+
+    val borderColor = if (isUser) {
+        MaterialTheme.colorScheme.primary.copy(alpha = 0.3f)
+    } else {
+        MaterialTheme.colorScheme.outline.copy(alpha = 0.2f)
     }
 
     Column(
         modifier = Modifier
             .fillMaxWidth()
-            .padding(vertical = 6.dp),
+            .padding(vertical = 4.dp),
         horizontalAlignment = alignment
     ) {
         Row(
-            verticalAlignment = Alignment.Bottom,
+            verticalAlignment = Alignment.Top,
             horizontalArrangement = if (isUser) Arrangement.End else Arrangement.Start,
-            modifier = Modifier.fillMaxWidth(0.92f)
+            modifier = Modifier.fillMaxWidth(0.95f)
         ) {
-            if (!isUser) {
-                AvatarIcon(isUser = false)
-                Spacer(modifier = Modifier.width(10.dp))
-            }
-
             Column(modifier = Modifier.weight(1f, fill = false)) {
-                // Thinking View Integration (Agora Style)
+                if (!isUser) {
+                    Text(
+                        text = "[NABD_OS]",
+                        style = MaterialTheme.typography.labelSmall,
+                        fontFamily = FontFamily.Monospace,
+                        color = MaterialTheme.colorScheme.primary,
+                        fontWeight = FontWeight.ExtraBold,
+                        modifier = Modifier.padding(bottom = 4.dp)
+                    )
+                }
+
+                // Thinking View Integration
                 if (!isUser && !message.thoughts.isNullOrBlank()) {
                     ThinkingAccordion(
                         thought = message.thoughts,
-                        title = "Agent Logic & Planning",
-                        initialExpanded = message.isPending // Expand by default while generating
+                        title = "CORE_LOGIC",
+                        initialExpanded = message.isPending
                     )
                     Spacer(modifier = Modifier.height(4.dp))
                 }
@@ -188,73 +204,50 @@ fun NabdMessageBubble(message: ChatMessage) {
                 Surface(
                     color = bubbleColor,
                     shape = RoundedCornerShape(
-                        topStart = 18.dp,
-                        topEnd = 18.dp,
-                        bottomStart = if (isUser) 18.dp else 4.dp,
-                        bottomEnd = if (isUser) 4.dp else 18.dp
+                        topStart = 2.dp,
+                        topEnd = 2.dp,
+                        bottomStart = if (isUser) 2.dp else 0.dp,
+                        bottomEnd = if (isUser) 0.dp else 2.dp
                     ),
-                    tonalElevation = if (isUser) 2.dp else 0.dp,
-                    modifier = Modifier.animateContentSize()
-                ) {
-                    Column(modifier = Modifier.padding(14.dp)) {
-                        if (!isUser) {
-                            Text(
-                                text = "NABD AI",
-                                style = MaterialTheme.typography.labelSmall,
-                                color = MaterialTheme.colorScheme.primary,
-                                fontWeight = FontWeight.ExtraBold,
-                                modifier = Modifier.padding(bottom = 6.dp)
+                    modifier = Modifier
+                        .border(
+                            width = 1.dp,
+                            color = borderColor,
+                            shape = RoundedCornerShape(
+                                topStart = 2.dp,
+                                topEnd = 2.dp,
+                                bottomStart = if (isUser) 2.dp else 0.dp,
+                                bottomEnd = if (isUser) 0.dp else 2.dp
                             )
-                        }
-
+                        )
+                        .animateContentSize(
+                            animationSpec = spring(
+                                dampingRatio = Spring.DampingRatioLowBouncy,
+                                stiffness = Spring.StiffnessLow
+                            )
+                        )
+                ) {
+                    Column(modifier = Modifier.padding(12.dp)) {
                         // Main Response Text
                         Text(
                             text = message.text,
                             style = MaterialTheme.typography.bodyMedium,
-                            lineHeight = 22.sp,
-                            color = if (isUser) MaterialTheme.colorScheme.onPrimaryContainer 
-                                    else MaterialTheme.colorScheme.onSurfaceVariant
+                            lineHeight = 20.sp,
+                            color = MaterialTheme.colorScheme.onSurface
                         )
 
                         if (message.isPending) {
-                            Spacer(modifier = Modifier.height(10.dp))
+                            Spacer(modifier = Modifier.height(8.dp))
                             LinearProgressIndicator(
-                                modifier = Modifier.fillMaxWidth().height(2.dp).clip(CircleShape),
+                                modifier = Modifier.fillMaxWidth().height(1.dp),
                                 color = MaterialTheme.colorScheme.primary,
-                                trackColor = MaterialTheme.colorScheme.primary.copy(alpha = 0.1f)
+                                trackColor = Color.Transparent
                             )
                         }
                     }
                 }
             }
-
-            if (isUser) {
-                Spacer(modifier = Modifier.width(10.dp))
-                AvatarIcon(isUser = true)
-            }
         }
-    }
-}
-
-@Composable
-fun AvatarIcon(isUser: Boolean) {
-    Box(
-        modifier = Modifier
-            .size(32.dp)
-            .clip(CircleShape)
-            .background(
-                if (isUser) MaterialTheme.colorScheme.secondaryContainer 
-                else MaterialTheme.colorScheme.tertiaryContainer
-            ),
-        contentAlignment = Alignment.Center
-    ) {
-        Icon(
-            imageVector = if (isUser) Icons.Default.Face else Icons.Default.SmartScreen,
-            contentDescription = null,
-            modifier = Modifier.size(20.dp),
-            tint = if (isUser) MaterialTheme.colorScheme.onSecondaryContainer 
-                   else MaterialTheme.colorScheme.onTertiaryContainer
-        )
     }
 }
 
@@ -266,16 +259,16 @@ fun NabdInputArea(
     onIntent: (ChatIntent) -> Unit
 ) {
     Surface(
-        shape = RoundedCornerShape(28.dp),
-        color = MaterialTheme.colorScheme.surfaceVariant,
-        tonalElevation = 8.dp,
+        shape = RoundedCornerShape(4.dp),
+        color = MaterialTheme.colorScheme.surface,
         modifier = Modifier
             .fillMaxWidth()
+            .border(1.dp, MaterialTheme.colorScheme.outline.copy(alpha = 0.3f), RoundedCornerShape(4.dp))
             .navigationBarsPadding()
             .imePadding()
     ) {
         Row(
-            modifier = Modifier.padding(horizontal = 16.dp, vertical = 8.dp),
+            modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp),
             verticalAlignment = Alignment.CenterVertically
         ) {
             TextField(
@@ -284,11 +277,13 @@ fun NabdInputArea(
                 modifier = Modifier.weight(1f),
                 placeholder = { 
                     Text(
-                        "Ask Nabd to plan or execute...",
-                        style = MaterialTheme.typography.bodyMedium,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.6f)
+                        "INPUT_STREEM >",
+                        style = MaterialTheme.typography.labelSmall,
+                        fontFamily = FontFamily.Monospace,
+                        color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.4f)
                     ) 
                 },
+                textStyle = MaterialTheme.typography.bodyMedium.copy(fontFamily = FontFamily.Monospace),
                 colors = TextFieldDefaults.colors(
                     focusedContainerColor = Color.Transparent,
                     unfocusedContainerColor = Color.Transparent,
@@ -300,21 +295,17 @@ fun NabdInputArea(
                 maxLines = 5
             )
 
-            Spacer(modifier = Modifier.width(8.dp))
-
-            FilledIconButton(
+            IconButton(
                 onClick = { onIntent(ChatIntent.SendPrompt) },
                 enabled = isModelLoaded && !isGenerating && prompt.isNotBlank(),
-                modifier = Modifier.size(48.dp),
-                colors = IconButtonDefaults.filledIconButtonColors(
-                    containerColor = MaterialTheme.colorScheme.primary,
-                    contentColor = MaterialTheme.colorScheme.onPrimary
-                )
+                modifier = Modifier.size(40.dp)
             ) {
                 Icon(
-                    Icons.Default.Send,
-                    contentDescription = "Send",
-                    modifier = Modifier.size(24.dp)
+                    Icons.Default.ArrowForward,
+                    contentDescription = "Execute",
+                    tint = if (isModelLoaded && !isGenerating && prompt.isNotBlank()) 
+                           MaterialTheme.colorScheme.primary 
+                           else MaterialTheme.colorScheme.outline
                 )
             }
         }

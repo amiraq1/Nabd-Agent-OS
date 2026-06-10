@@ -20,56 +20,59 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import androidx.compose.animation.core.Spring
+import androidx.compose.animation.core.spring
+import androidx.compose.foundation.border
+import androidx.compose.ui.text.font.FontFamily
 
 /**
- * ThinkingAccordion: A premium interactive component to display agent's reasoning steps.
- * Inspired by Agora's "Thinking" view.
+ * ThinkingAccordion: A brutalist, intentional minimalism component for agent logic traces.
  */
 @Composable
 fun ThinkingAccordion(
     thought: String,
-    title: String = "Reasoning Process",
+    title: String = "LOGIC_TRACE",
     initialExpanded: Boolean = false
 ) {
     var isExpanded by remember { mutableStateOf(initialExpanded) }
     val rotation by animateFloatAsState(if (isExpanded) 180f else 0f)
 
     Surface(
-        color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.4f),
-        shape = RoundedCornerShape(12.dp),
+        color = MaterialTheme.colorScheme.surface,
+        shape = RoundedCornerShape(2.dp),
         modifier = Modifier
             .fillMaxWidth()
             .padding(vertical = 4.dp)
-            .animateContentSize()
+            .border(1.dp, MaterialTheme.colorScheme.outline.copy(alpha = 0.5f), RoundedCornerShape(2.dp))
+            .animateContentSize(
+                animationSpec = spring(
+                    dampingRatio = Spring.DampingRatioHighBouncy,
+                    stiffness = Spring.StiffnessLow
+                )
+            )
     ) {
         Column {
             Row(
                 modifier = Modifier
                     .fillMaxWidth()
                     .clickable { isExpanded = !isExpanded }
-                    .padding(12.dp),
+                    .padding(8.dp),
                 verticalAlignment = Alignment.CenterVertically
             ) {
-                Icon(
-                    imageVector = Icons.Default.Face,
-                    contentDescription = null,
-                    tint = MaterialTheme.colorScheme.primary,
-                    modifier = Modifier.size(18.dp)
-                )
-                Spacer(modifier = Modifier.width(8.dp))
                 Text(
-                    text = title,
-                    style = MaterialTheme.typography.labelMedium,
+                    text = "> $title",
+                    style = MaterialTheme.typography.labelSmall,
+                    fontFamily = FontFamily.Monospace,
                     fontWeight = FontWeight.Bold,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    color = MaterialTheme.colorScheme.primary,
                     modifier = Modifier.weight(1f)
                 )
                 Icon(
                     imageVector = Icons.Default.KeyboardArrowDown,
                     contentDescription = null,
-                    tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                    tint = MaterialTheme.colorScheme.primary,
                     modifier = Modifier
-                        .size(18.dp)
+                        .size(16.dp)
                         .rotate(rotation)
                 )
             }
@@ -77,18 +80,17 @@ fun ThinkingAccordion(
             AnimatedVisibility(visible = isExpanded) {
                 Column(
                     modifier = Modifier
-                        .padding(start = 12.dp, end = 12.dp, bottom = 12.dp)
+                        .padding(start = 8.dp, end = 8.dp, bottom = 8.dp)
                         .fillMaxWidth()
+                        .background(MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.2f))
+                        .padding(8.dp)
                 ) {
-                    Divider(
-                        color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.1f),
-                        modifier = Modifier.padding(bottom = 8.dp)
-                    )
                     Text(
                         text = thought,
                         style = MaterialTheme.typography.bodySmall,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.8f),
-                        lineHeight = 18.sp
+                        fontFamily = FontFamily.Monospace,
+                        color = MaterialTheme.colorScheme.onSurface,
+                        lineHeight = 16.sp
                     )
                 }
             }

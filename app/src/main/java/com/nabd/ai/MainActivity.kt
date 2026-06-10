@@ -24,6 +24,7 @@ import com.nabd.ai.local.rag.ingestion.KnowledgeIngestionManager
 import com.nabd.ai.local.rag.retrieval.KnowledgeRetriever
 import com.nabd.ai.local.autonomy.runtime.AutonomousAgentRunner
 import com.nabd.ai.local.autonomy.history.ExecutionTimeline
+import kotlinx.coroutines.launch
 
 class MainActivity : ComponentActivity() {
 
@@ -110,12 +111,19 @@ fun MainApp(
                 }
                 "autonomy" -> {
                     val agentState by agentRunner.state.collectAsState()
+                    val currentPlan by agentRunner.currentPlan.collectAsState()
+                    val scope = rememberCoroutineScope()
+                    
                     com.nabd.ai.local.ui.autonomy.AgentExecutionScreen(
                         state = agentState,
-                        plan = null, 
+                        plan = currentPlan, 
                         timeline = timeline.events,
                         onPause = { agentRunner.pause() },
-                        onResume = { /* handle via coroutine scope */ },
+                        onResume = { 
+                            scope.launch {
+                                agentRunner.resumeGoal()
+                            }
+                        },
                         onCancel = { agentRunner.cancel() }
                     )
                 }

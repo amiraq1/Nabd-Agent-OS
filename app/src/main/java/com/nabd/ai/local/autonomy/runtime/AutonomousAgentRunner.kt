@@ -30,16 +30,26 @@ class AutonomousAgentRunner(
     private val _state = MutableStateFlow(AutonomousExecutionState.IDLE)
     val state: StateFlow<AutonomousExecutionState> = _state.asStateFlow()
 
+    private val _currentPlan = MutableStateFlow<ExecutionPlan?>(null)
+    val currentPlan: StateFlow<ExecutionPlan?> = _currentPlan.asStateFlow()
+
     private var isCancelled = false
+
+    init {
+        // Initialize current plan if there is an active session
+        _currentPlan.value = sessionManager.currentSession?.currentPlan
+    }
 
     suspend fun startGoal(goal: String) {
         isCancelled = false
         val session = sessionManager.createSession(goal)
+        _currentPlan.value = null // Reset for new goal
         timeline.addEvent(EventType.PLAN_CREATED, "Received goal: ${goal.take(50)}...")
         
         _state.value = AutonomousExecutionState.PLANNING
         val plan = planner.generatePlan(goal, emptyList()) // Pass tools list properly in real usage
         session.currentPlan = plan
+        _currentPlan.value = plan
         sessionManager.save()
         
         timeline.addEvent(EventType.PLAN_CREATED, "Generated plan with ${plan.steps.size} steps.")
@@ -51,6 +61,7 @@ class AutonomousAgentRunner(
         isCancelled = false
         val session = sessionManager.resumeLatestSession() ?: return
         val plan = session.currentPlan ?: return
+        _currentPlan.value = plan
         
         if (session.isPaused) {
             session.isPaused = false

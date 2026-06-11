@@ -5,7 +5,7 @@ import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
 import com.nabd.ai.ui.theme.NabdTheme
-import com.nabd.ai.ui.AvantGardeAppLayout
+
 
 /**
  * MainActivity: Edge-to-Edge Minimalism - Bootstrapping the Nabd OS.
@@ -25,7 +25,7 @@ class MainActivity : ComponentActivity() {
         setContent {
             NabdTheme {
                 // The new Avant-Garde UI layout that depends on AppContainer instead of raw managers
-                AvantGardeAppLayout(appContainer)
+                com.nabd.ai.ui.AvantGardeAppLayout(appContainer)
             }
         }
     }

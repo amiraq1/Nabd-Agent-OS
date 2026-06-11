@@ -25,21 +25,19 @@ fun NabdToolCallBlock(
     result: ToolResult?,
     modifier: Modifier = Modifier
 ) {
-    // التكوين المكاني: صندوق بألوان أحادية، حدود دقيقة، بدون زوايا دائرية (Radius = 0)
     Column(
         modifier = modifier
             .fillMaxWidth()
-            .background(Color(0xFF0F0F11))
-            .border(1.dp, Color(0xFF2A2A30))
+            .background(Color(0xFF0F0F12))
+            .border(1.dp, androidx.compose.material3.MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.2f))
             .padding(16.dp)
     ) {
         Row(verticalAlignment = Alignment.CenterVertically) {
             Text(
                 text = "EXEC :: $toolName".uppercase(),
-                style = TextStyle(
-                    color = Color(0xFF8A8A93),
+                style = androidx.compose.material3.MaterialTheme.typography.labelMedium.copy(
+                    color = Color(0xFF6B6B76),
                     fontFamily = FontFamily.Monospace,
-                    fontSize = 12.sp,
                     letterSpacing = 1.sp
                 )
             )
@@ -49,26 +47,23 @@ fun NabdToolCallBlock(
 
         Text(
             text = arguments,
-            style = TextStyle(
-                color = Color(0xFF5E5E66),
-                fontFamily = FontFamily.Monospace,
-                fontSize = 14.sp
+            style = androidx.compose.material3.MaterialTheme.typography.bodyMedium.copy(
+                color = Color(0xFF6B6B76),
+                fontFamily = FontFamily.Monospace
             )
         )
 
-        // عرض النتيجة بتباين لوني تكتيكي عند توفرها
         if (result != null) {
             Spacer(modifier = Modifier.height(12.dp))
             val (resultColor, resultText) = when (result) {
-                is ToolResult.Success -> Color(0xFFD4D4D8) to "SUCCESS :: ${result.output.take(80)}..."
-                is ToolResult.Failure -> Color(0xFFD32F2F) to "FAULT :: ${result.reason}"
+                is ToolResult.Success -> Color(0xFF00E5FF) to "SUCCESS :: ${result.output.take(80)}..."
+                is ToolResult.Failure -> androidx.compose.material3.MaterialTheme.colorScheme.primary to "FAULT :: ${result.reason}"
             }
             Text(
                 text = resultText,
-                style = TextStyle(
+                style = androidx.compose.material3.MaterialTheme.typography.bodyMedium.copy(
                     color = resultColor,
-                    fontFamily = FontFamily.Monospace,
-                    fontSize = 12.sp
+                    fontFamily = FontFamily.Monospace
                 )
             )
         }

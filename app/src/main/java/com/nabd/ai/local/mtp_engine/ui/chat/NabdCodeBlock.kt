@@ -21,19 +21,17 @@ fun NabdCodeBlock(
     language: String? = null,
     modifier: Modifier = Modifier
 ) {
-    // التكوين المكاني: كسر الشبكة عبر حواف حادة وتباين لوني طفيف جداً بدلاً من البطاقات (Cards)
     Column(
         modifier = modifier
             .fillMaxWidth()
-            .background(Color(0xFF121214)) // تباين دقيق عن الخلفية 0xFF0A0A0C
+            .background(Color(0xFF0F0F12)) // Tactical Code Background
             .padding(start = 24.dp, top = 24.dp, bottom = 24.dp, end = 16.dp)
     ) {
         if (!language.isNullOrBlank()) {
             Text(
                 text = language.uppercase(),
-                style = TextStyle(
-                    color = Color(0xFF5E5E66),
-                    fontSize = 11.sp,
+                style = androidx.compose.material3.MaterialTheme.typography.labelMedium.copy(
+                    color = Color(0xFF6B6B76), // SteelGray
                     fontFamily = FontFamily.Monospace,
                     letterSpacing = 1.5.sp
                 ),
@@ -43,10 +41,9 @@ fun NabdCodeBlock(
         
         Text(
             text = code,
-            style = TextStyle(
-                color = Color(0xFFD4D4D8),
-                fontSize = 14.sp,
-                fontFamily = FontFamily.Monospace, // طباعة برمجية صرفة
+            style = androidx.compose.material3.MaterialTheme.typography.bodyMedium.copy(
+                color = Color(0xFF00E5FF), // Cyan code for tactical terminal feel
+                fontFamily = FontFamily.Monospace,
                 lineHeight = 24.sp
             )
         )

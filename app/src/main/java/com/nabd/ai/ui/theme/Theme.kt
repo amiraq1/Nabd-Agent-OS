@@ -12,49 +12,24 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalView
 import androidx.core.view.WindowCompat
 
-/**
- * Nabd Updated Theme: Inspired by Agora's premium aesthetic.
- * Features Midnight Tonal Spot color scheme and dynamic color support.
- */
-
-// Midnight Seed Color (From Agora)
-private val MidnightSeed = Color(0xFF1A237E)
-
-// High-fidelity dark scheme for Nabd
+// Tactical Pulse scheme for Nabd
 private val NabdDarkColorScheme = darkColorScheme(
-    primary = Color(0xFFBAC3FF),
-    onPrimary = Color(0xFF001061),
-    primaryContainer = Color(0xFF001D91),
-    onPrimaryContainer = Color(0xFFDEE0FF),
-    secondary = Color(0xFFC3C5DD),
-    onSecondary = Color(0xFF2D2F42),
-    secondaryContainer = Color(0xFF434559),
-    onSecondaryContainer = Color(0xFFDFE1F9),
-    background = Color(0xFF1B1B1F),
-    surface = Color(0xFF1B1B1F),
-    onBackground = Color(0xFFE4E1E6),
-    onSurface = Color(0xFFE4E1E6),
-    surfaceVariant = Color(0xFF46464F),
-    onSurfaceVariant = Color(0xFFC7C5D0)
+    primary = NabdCrimson,
+    onPrimary = OffWhite,
+    primaryContainer = ActionCyan,
+    onPrimaryContainer = DeepObsidian,
+    secondary = SteelGray,
+    onSecondary = OffWhite,
+    background = DeepObsidian,
+    surface = Gunmetal,
+    onBackground = OffWhite,
+    onSurface = OffWhite,
+    surfaceVariant = SurfaceHighlight,
+    onSurfaceVariant = SteelGray
 )
 
-// High-fidelity light scheme for Nabd
-private val NabdLightColorScheme = lightColorScheme(
-    primary = Color(0xFF3F51B5),
-    onPrimary = Color(0xFFFFFFFF),
-    primaryContainer = Color(0xFFDEE0FF),
-    onPrimaryContainer = Color(0xFF001061),
-    secondary = Color(0xFF5B5D72),
-    onSecondary = Color(0xFFFFFFFF),
-    secondaryContainer = Color(0xFFDFE1F9),
-    onSecondaryContainer = Color(0xFF181A2C),
-    background = Color(0xFFFEFBFF),
-    surface = Color(0xFFFEFBFF),
-    onBackground = Color(0xFF1B1B1F),
-    onSurface = Color(0xFF1B1B1F),
-    surfaceVariant = Color(0xFFE3E1EC),
-    onSurfaceVariant = Color(0xFF46464F)
-)
+// Tactical OS defaults to Dark Mode always
+private val NabdLightColorScheme = NabdDarkColorScheme
 
 @Composable
 fun NabdTheme(

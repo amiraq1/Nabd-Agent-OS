@@ -16,6 +16,20 @@ class ConversationRepository(
     private val chatDao: MtpChatDao
 ) {
     /**
+     * إنشاء أو تحديث المحادثة لتجنب مشاكل Foreign Key Constraint
+     */
+    suspend fun createConversation(id: String, title: String = "New Chat") {
+        chatDao.upsertConversation(
+            com.nabd.ai.local.mtp_engine.data.local.ConversationEntity(
+                id = id,
+                title = title,
+                selectedBranchesJson = "{}",
+                lastUpdated = System.currentTimeMillis()
+            )
+        )
+    }
+
+    /**
      * تحميل رسائل المحادثة وتحويلها فوراً إلى نماذج واجهة المستخدم (Domain Models)
      */
     suspend fun loadMessages(conversationId: String): List<ChatMessage> {

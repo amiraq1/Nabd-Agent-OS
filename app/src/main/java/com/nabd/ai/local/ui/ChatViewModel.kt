@@ -96,6 +96,9 @@ class ChatViewModel(
 
     private fun loadActiveConversation() {
         viewModelScope.launch {
+            // Ensure the conversation entity exists before inserting messages
+            conversationRepository.createConversation(currentConversationId)
+            
             val messages = conversationRepository.loadMessages(currentConversationId)
             if (messages.isNotEmpty()) {
                 // Reconstruct tree in manager (simplified for now)

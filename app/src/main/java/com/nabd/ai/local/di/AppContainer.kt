@@ -83,6 +83,10 @@ class AppContainer(private val context: Context) {
         KnowledgeIngestionManager(context, database.knowledgeDao(), embeddingManager)
     }
 
+    val conversationRepository by lazy {
+        com.nabd.ai.local.mtp_engine.data.repository.ConversationRepository(database.mtpChatDao())
+    }
+
     val workspaceManager by lazy {
         LocalSandboxManager(File(context.filesDir, "workspace"))
     }
@@ -163,7 +167,13 @@ class AppContainer(private val context: Context) {
     }
 
     fun provideChatViewModel(): com.nabd.ai.local.ui.ChatViewModel {
-        return com.nabd.ai.local.ui.ChatViewModel(engine, settingsRepository, semanticRetriever, knowledgeRetriever)
+        return com.nabd.ai.local.ui.ChatViewModel(
+            engine,
+            settingsRepository,
+            semanticRetriever,
+            knowledgeRetriever,
+            conversationRepository
+        )
     }
 
     fun provideSettingsViewModel(): com.nabd.ai.local.ui.SettingsViewModel {

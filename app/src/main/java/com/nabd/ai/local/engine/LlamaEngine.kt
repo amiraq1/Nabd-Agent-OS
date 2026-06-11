@@ -1,5 +1,8 @@
 package com.nabd.ai.local.engine
 
+import com.nabd.ai.local.mtp_engine.api.LlamaChatEngine
+import com.nabd.ai.local.mtp_engine.architecture.ChatMessage
+import com.nabd.ai.local.mtp_engine.architecture.Participant
 import kotlinx.coroutines.channels.awaitClose
 import kotlinx.coroutines.flow.*
 import kotlinx.coroutines.sync.Mutex
@@ -7,10 +10,10 @@ import kotlinx.coroutines.sync.withLock
 import android.util.Log
 
 /**
- * LlamaEngine: Implementation of [LlmProvider] using llama.cpp.
+ * LlamaEngine: Implementation of [LlmProvider] and [LlamaChatEngine] using llama.cpp.
  * Uses explicit JNI bindings to interact with the native C++ runtime.
  */
-class LlamaEngine : LlmProvider, java.io.Closeable {
+class LlamaEngine : LlmProvider, LlamaChatEngine, java.io.Closeable {
 
     private val _state = MutableStateFlow<EngineState>(EngineState.Initialized)
     override val state: StateFlow<EngineState> = _state.asStateFlow()
@@ -30,7 +33,10 @@ class LlamaEngine : LlmProvider, java.io.Closeable {
 
     override suspend fun loadModel(modelPath: String) = mutex.withLock {
         if (_state.value !is EngineState.Initialized && _state.value !is EngineState.Unloaded) {
-            throw IllegalStateException("Cannot load model from state: ${_state.value}")
+            // Unload existing model if necessary
+            if (_state.value is EngineState.Loaded || _state.value is EngineState.Failed) {
+                nativeUnloadModel(nativeContextHandle)
+            }
         }
 
         _state.value = EngineState.Loading
@@ -42,6 +48,30 @@ class LlamaEngine : LlmProvider, java.io.Closeable {
             _state.value = EngineState.Failed("Failed to load model at $modelPath")
         }
     }
+
+    /**
+     * applyChatTemplate: Basic implementation of chat templating.
+     * In a real implementation, this would call native JNI to use GGUF templates.
+     */
+    override suspend fun applyChatTemplate(messages: List<ChatMessage>): String {
+        return messages.joinToString("\n") { 
+            when (it.participant) {
+                Participant.SYSTEM -> "System: ${it.text}"
+                Participant.USER -> "User: ${it.text}"
+                Participant.ASSISTANT -> "Assistant: ${it.text}"
+            }
+        } + "\nAssistant: "
+    }
+
+    override suspend fun computeEmbedding(text: String): FloatArray {
+        // TODO: Call native JNI to compute embeddings. 
+        // Returning a dummy vector for now to satisfy the compiler.
+        return FloatArray(384) { 0.1f } 
+    }
+
+    override fun streamTokens(prompt: String): Flow<String> = generateText(prompt)
+
+    override fun cancel() = stopGeneration()
 
     override fun generateText(prompt: String, grammar: String?): Flow<String> = callbackFlow {
         if (_state.value !is EngineState.Loaded) {

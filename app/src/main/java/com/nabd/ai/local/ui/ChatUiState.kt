@@ -1,27 +1,19 @@
 package com.nabd.ai.local.ui
 
-import com.nabd.ai.local.engine.EngineState
-import java.util.UUID
+import androidx.compose.runtime.Stable
+import com.nabd.ai.local.mtp_engine.architecture.ChatMessage
+import com.nabd.ai.local.mtp_engine.domain.generation.GenerationError
+import com.nabd.ai.local.mtp_engine.domain.generation.InferenceConfig
 
 /**
- * ChatUiState: Immutable representation of the Chat Screen's state.
+ * ChatUiState: Pure, lightweight, and immutable representation of the UI state.
+ * Following strict Unidirectional Data Flow (UDF).
  */
+@Stable
 data class ChatUiState(
-    val engineState: EngineState = EngineState.Initialized,
-    val currentPrompt: String = "",
     val messages: List<ChatMessage> = emptyList(),
+    val activeBranchId: String? = null,
     val isGenerating: Boolean = false,
-    val isModelLoaded: Boolean = false,
-    val error: String? = null
-)
-
-/**
- * ChatMessage: Represents a single message in the conversation.
- */
-data class ChatMessage(
-    val id: String = UUID.randomUUID().toString(),
-    val text: String,
-    val isUser: Boolean,
-    val isPending: Boolean = false,
-    val thoughts: String? = null
+    val errorState: GenerationError? = null,
+    val inferenceConfig: InferenceConfig = InferenceConfig()
 )

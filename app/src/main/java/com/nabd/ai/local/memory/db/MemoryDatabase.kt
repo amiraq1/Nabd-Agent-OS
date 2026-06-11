@@ -8,6 +8,9 @@ import androidx.room.TypeConverters
 import com.nabd.ai.local.memory.MemoryEntity
 import com.nabd.ai.local.embedding.db.MemoryEmbeddingDao
 import com.nabd.ai.local.embedding.db.MemoryEmbeddingEntity
+import com.nabd.ai.local.mtp_engine.data.local.ConversationEntity
+import com.nabd.ai.local.mtp_engine.data.local.MessageEntity
+import com.nabd.ai.local.mtp_engine.data.local.MtpChatDao
 import com.nabd.ai.local.rag.db.*
 
 @Database(
@@ -16,15 +19,18 @@ import com.nabd.ai.local.rag.db.*
         MemoryEmbeddingEntity::class,
         KnowledgeDocumentEntity::class,
         KnowledgeChunkEntity::class,
-        KnowledgeEmbeddingEntity::class
+        KnowledgeEmbeddingEntity::class,
+        ConversationEntity::class,
+        MessageEntity::class
     ], 
-    version = 3
+    version = 4
 )
 @TypeConverters(Converters::class)
 abstract class MemoryDatabase : RoomDatabase() {
     abstract fun memoryDao(): MemoryDao
     abstract fun memoryEmbeddingDao(): MemoryEmbeddingDao
     abstract fun knowledgeDao(): KnowledgeDao
+    abstract fun mtpChatDao(): MtpChatDao
 
     companion object {
         @Volatile

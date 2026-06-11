@@ -102,6 +102,10 @@ dependencies {
     // JSON
     implementation("org.json:json:20231013")
     
+    // OkHttp for SSE
+    implementation("com.squareup.okhttp3:okhttp:4.12.0")
+    implementation("com.squareup.okhttp3:okhttp-sse:4.12.0")
+    
     // PDF Parsing
     implementation("com.tom-roush:pdfbox-android:2.0.27.0")
     

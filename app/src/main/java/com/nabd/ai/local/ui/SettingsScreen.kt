@@ -31,7 +31,10 @@ fun SettingsScreen(
     onSelect: (LocalModel) -> Unit,
     onDelete: (LocalModel) -> Unit,
     onImportDocument: (Uri, String) -> Unit,
-    onDeleteDocument: (String) -> Unit
+    onDeleteDocument: (String) -> Unit,
+    onProviderSelect: (com.nabd.ai.local.engine.ProviderType) -> Unit,
+    onOpenAiKeyChange: (String) -> Unit,
+    onGeminiKeyChange: (String) -> Unit
 ) {
     val modelLauncher = rememberLauncherForActivityResult(
         contract = ActivityResultContracts.OpenDocument()
@@ -51,13 +54,71 @@ fun SettingsScreen(
         TopAppBar(title = { Text("Settings & Knowledge") })
 
         TabRow(selectedTabIndex = selectedTab) {
-            Tab(selected = selectedTab == 0, onClick = { selectedTab = 0 }, text = { Text("Models") })
-            Tab(selected = selectedTab == 1, onClick = { selectedTab = 1 }, text = { Text("Knowledge") })
+            Tab(selected = selectedTab == 0, onClick = { selectedTab = 0 }, text = { Text("Providers") })
+            Tab(selected = selectedTab == 1, onClick = { selectedTab = 1 }, text = { Text("Models") })
+            Tab(selected = selectedTab == 2, onClick = { selectedTab = 2 }, text = { Text("Knowledge") })
         }
 
         when (selectedTab) {
-            0 -> ModelsTab(uiState, modelLauncher, onSelect, onDelete)
-            1 -> KnowledgeTab(uiState, docLauncher, onDeleteDocument)
+            0 -> ProvidersTab(uiState, onProviderSelect, onOpenAiKeyChange, onGeminiKeyChange)
+            1 -> ModelsTab(uiState, modelLauncher, onSelect, onDelete)
+            2 -> KnowledgeTab(uiState, docLauncher, onDeleteDocument)
+        }
+    }
+}
+
+@Composable
+fun ProvidersTab(
+    uiState: SettingsUiState,
+    onProviderSelect: (com.nabd.ai.local.engine.ProviderType) -> Unit,
+    onOpenAiKeyChange: (String) -> Unit,
+    onGeminiKeyChange: (String) -> Unit
+) {
+    LazyColumn(
+        contentPadding = PaddingValues(16.dp),
+        verticalArrangement = Arrangement.spacedBy(16.dp),
+        modifier = Modifier.fillMaxSize()
+    ) {
+        item {
+            Text("Select LLM Provider", style = MaterialTheme.typography.titleMedium)
+        }
+        item {
+            com.nabd.ai.local.engine.ProviderType.values().forEach { provider ->
+                Row(
+                    verticalAlignment = Alignment.CenterVertically,
+                    modifier = Modifier.fillMaxWidth().clickable { onProviderSelect(provider) }
+                ) {
+                    RadioButton(
+                        selected = uiState.activeProvider == provider.name,
+                        onClick = { onProviderSelect(provider) }
+                    )
+                    Spacer(Modifier.width(8.dp))
+                    Text(provider.name)
+                }
+            }
+        }
+        item {
+            Divider()
+            Spacer(Modifier.height(16.dp))
+            Text("API Keys", style = MaterialTheme.typography.titleMedium)
+        }
+        item {
+            OutlinedTextField(
+                value = uiState.openAiApiKey ?: "",
+                onValueChange = onOpenAiKeyChange,
+                label = { Text("OpenAI API Key") },
+                modifier = Modifier.fillMaxWidth(),
+                singleLine = true
+            )
+        }
+        item {
+            OutlinedTextField(
+                value = uiState.geminiApiKey ?: "",
+                onValueChange = onGeminiKeyChange,
+                label = { Text("Gemini API Key") },
+                modifier = Modifier.fillMaxWidth(),
+                singleLine = true
+            )
         }
     }
 }

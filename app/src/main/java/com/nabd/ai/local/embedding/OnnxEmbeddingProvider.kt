@@ -28,8 +28,15 @@ class OnnxEmbeddingProvider(
         ortEnvironment = OrtEnvironment.getEnvironment()
         val options = OrtSession.SessionOptions()
         
-        // Load model from assets or file system. Assuming file system path for now.
-        ortSession = ortEnvironment?.createSession(modelPath, options)
+        try {
+            if (java.io.File(modelPath).exists()) {
+                ortSession = ortEnvironment?.createSession(modelPath, options)
+            } else {
+                android.util.Log.w("OnnxEmbeddingProvider", "Model file not found at $modelPath. Session not initialized.")
+            }
+        } catch (e: Exception) {
+            android.util.Log.e("OnnxEmbeddingProvider", "Failed to load model from $modelPath", e)
+        }
     }
 
     override suspend fun embed(text: String): FloatArray = withContext(Dispatchers.Default) {

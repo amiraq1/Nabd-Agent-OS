@@ -16,6 +16,9 @@ import com.nabd.ai.local.rag.ingestion.KnowledgeIngestionManager
 data class SettingsUiState(
     val models: List<LocalModel> = emptyList(),
     val activeModelName: String? = null,
+    val activeProvider: String = com.nabd.ai.local.engine.ProviderType.LOCAL_LLAMA.name,
+    val openAiApiKey: String? = null,
+    val geminiApiKey: String? = null,
     val importState: ModelImportState = ModelImportState.Idle,
     val documents: List<KnowledgeDocumentEntity> = emptyList()
 )
@@ -44,6 +47,19 @@ class SettingsViewModel(
         // Observe active model
         settingsRepository.activeModelName
             .onEach { name -> _uiState.update { it.copy(activeModelName = name) } }
+            .launchIn(viewModelScope)
+
+        // Observe provider and keys
+        settingsRepository.activeProvider
+            .onEach { provider -> _uiState.update { it.copy(activeProvider = provider) } }
+            .launchIn(viewModelScope)
+
+        settingsRepository.openAiApiKey
+            .onEach { key -> _uiState.update { it.copy(openAiApiKey = key) } }
+            .launchIn(viewModelScope)
+
+        settingsRepository.geminiApiKey
+            .onEach { key -> _uiState.update { it.copy(geminiApiKey = key) } }
             .launchIn(viewModelScope)
 
         modelManager.importState
@@ -87,6 +103,24 @@ class SettingsViewModel(
                 settingsRepository.clearActiveModel()
             }
             refreshModels()
+        }
+    }
+
+    fun setProvider(provider: com.nabd.ai.local.engine.ProviderType) {
+        viewModelScope.launch {
+            settingsRepository.setActiveProvider(provider)
+        }
+    }
+
+    fun setOpenAiApiKey(key: String) {
+        viewModelScope.launch {
+            settingsRepository.setOpenAiApiKey(key)
+        }
+    }
+
+    fun setGeminiApiKey(key: String) {
+        viewModelScope.launch {
+            settingsRepository.setGeminiApiKey(key)
         }
     }
 

@@ -105,7 +105,10 @@ fun AvantGardeAppLayout(appContainer: AppContainer) {
                         onSelect = settingsViewModel::selectModel,
                         onDelete = settingsViewModel::deleteModel,
                         onImportDocument = settingsViewModel::importDocument,
-                        onDeleteDocument = settingsViewModel::deleteDocument
+                        onDeleteDocument = settingsViewModel::deleteDocument,
+                        onProviderSelect = settingsViewModel::setProvider,
+                        onOpenAiKeyChange = settingsViewModel::setOpenAiApiKey,
+                        onGeminiKeyChange = settingsViewModel::setGeminiApiKey
                     )
                 }
             }

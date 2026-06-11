@@ -40,7 +40,7 @@ class AppContainer(private val context: Context) {
 
     val settingsRepository by lazy { SettingsRepository(context) }
     val modelManager by lazy { ModelManager(context) }
-    val engine by lazy { LlamaEngine() }
+    val engine by lazy { com.nabd.ai.local.engine.EngineManager(settingsRepository) }
 
     val database by lazy { MemoryDatabase.getDatabase(context) }
     

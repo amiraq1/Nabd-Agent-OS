@@ -42,8 +42,8 @@ class ArchitectureMemory(private val memoryFile: File) {
 
     fun save(snapshot: ArchitectureSnapshot) {
         val json = JSONObject().apply {
-            put("entryPoints", snapshot.entryPoints)
-            put("coreModules", snapshot.coreModules)
+            put("entryPoints", org.json.JSONArray(snapshot.entryPoints))
+            put("coreModules", org.json.JSONArray(snapshot.coreModules))
             put("description", snapshot.description)
             put("timestamp", snapshot.timestamp)
         }

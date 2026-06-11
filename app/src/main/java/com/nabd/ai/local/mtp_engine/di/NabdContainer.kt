@@ -63,6 +63,14 @@ class NabdContainer(private val applicationContext: Context) {
         ) 
     }
 
+    val embeddingProvider by lazy { OnnxEmbeddingProvider(applicationContext, "all-minilm-l6-v2.onnx") }
+    val vectorStore by lazy { VectorStore(database.memoryEmbeddingDao()) }
+    val embeddingManager by lazy { EmbeddingManager(embeddingProvider, vectorStore) }
+    val semanticRetriever by lazy { SemanticMemoryRetriever(database.memoryDao(), vectorStore, embeddingManager) }
+    val localVectorDatabase by lazy { LocalVectorDatabase(database.knowledgeDao()) }
+    val hybridRetriever by lazy { HybridRetriever(localVectorDatabase, embeddingManager) }
+    val knowledgeRetriever by lazy { KnowledgeRetriever(hybridRetriever, database.knowledgeDao()) }
+
     val chatStateOrchestrator: ChatStateOrchestrator by lazy {
         ChatViewModel(
             engine = llamaEngine,

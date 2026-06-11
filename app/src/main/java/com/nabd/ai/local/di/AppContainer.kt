@@ -38,6 +38,8 @@ import java.io.File
 
 class AppContainer(private val context: Context) {
 
+    val mtpContainer by lazy { com.nabd.ai.local.mtp_engine.di.NabdContainer(context) }
+
     val settingsRepository by lazy { SettingsRepository(context) }
     val modelManager by lazy { ModelManager(context) }
     val engine by lazy { com.nabd.ai.local.engine.EngineManager(settingsRepository) }
@@ -168,11 +170,13 @@ class AppContainer(private val context: Context) {
 
     fun provideChatViewModel(): com.nabd.ai.local.ui.ChatViewModel {
         return com.nabd.ai.local.ui.ChatViewModel(
-            engine,
+            mtpContainer.llamaEngine,
             settingsRepository,
             semanticRetriever,
             knowledgeRetriever,
-            conversationRepository
+            mtpContainer.conversationRepository,
+            mtpContainer.toolOrchestrator,
+            mtpContainer.ragManager
         )
     }
 

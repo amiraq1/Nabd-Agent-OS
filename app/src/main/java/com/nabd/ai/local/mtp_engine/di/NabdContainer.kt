@@ -62,16 +62,4 @@ class NabdContainer(private val applicationContext: Context) {
             contextAssembler = contextAssembler
         ) 
     }
-
-    val chatStateOrchestrator: ChatStateOrchestrator by lazy {
-        ChatViewModel(
-            engine = llamaEngine,
-            settingsRepository = settingsRepository,
-            semanticRetriever = semanticRetriever,
-            knowledgeRetriever = knowledgeRetriever,
-            conversationRepository = conversationRepository,
-            toolOrchestrator = toolOrchestrator,
-            ragManager = ragManager
-        )
-    }
 }

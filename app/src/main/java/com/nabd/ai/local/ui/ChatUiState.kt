@@ -14,6 +14,7 @@ data class ChatUiState(
     val messages: List<ChatMessage> = emptyList(),
     val activeBranchId: String? = null,
     val isGenerating: Boolean = false,
+    val selectedModel: String = "local:gguf-model",
     val errorState: GenerationError? = null,
     val inferenceConfig: InferenceConfig = InferenceConfig()
 )

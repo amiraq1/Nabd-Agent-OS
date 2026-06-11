@@ -8,7 +8,12 @@ import java.util.UUID
 enum class Participant {
     USER,
     ASSISTANT,
-    SYSTEM
+    SYSTEM,
+    ERROR
+}
+
+enum class MessageStatus {
+    TRANSCRIBING, SENDING, THINKING, TOOL_CALLING, SUCCESS, STOPPED, ERROR
 }
 
 /**
@@ -19,9 +24,13 @@ data class ChatMessage(
     val id: String = UUID.randomUUID().toString(),
     val text: String,
     val participant: Participant,
+    val status: MessageStatus = MessageStatus.SUCCESS,
     val isPending: Boolean = false,
     val thoughts: String? = null,
+    val thoughtTitle: String? = null,
+    val modelName: String? = null,
     val parentId: String? = null,
     val childIds: List<String> = emptyList(),
+    val attachments: List<SelectedAttachment> = emptyList(),
     val timestamp: Long = System.currentTimeMillis()
 )

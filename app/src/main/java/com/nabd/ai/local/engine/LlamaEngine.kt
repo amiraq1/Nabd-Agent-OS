@@ -59,6 +59,7 @@ class LlamaEngine : LlmProvider, LlamaChatEngine, java.io.Closeable {
                 Participant.SYSTEM -> "System: ${it.text}"
                 Participant.USER -> "User: ${it.text}"
                 Participant.ASSISTANT -> "Assistant: ${it.text}"
+                Participant.ERROR -> "Error: ${it.text}"
             }
         } + "\nAssistant: "
     }

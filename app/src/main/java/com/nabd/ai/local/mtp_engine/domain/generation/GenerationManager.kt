@@ -21,7 +21,7 @@ class GenerationManager(
         activePath: List<ChatMessage>,
         config: InferenceConfig = InferenceConfig(),
         systemPrompt: String = NabdPersona.NUCLEAR_PROMPT
-    ): Flow<GenerationChunk> = flow {
+    ): Flow<GenerationChunk> = flow<GenerationChunk> {
         
         // 1. Assemble context window (Off-main thread)
         val safeContext = contextAssembler.assembleContext(activePath, systemPrompt)

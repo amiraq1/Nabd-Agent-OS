@@ -17,7 +17,7 @@ import androidx.lifecycle.viewmodel.compose.viewModel
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.ViewModelProvider
 import com.nabd.ai.local.di.AppContainer
-import com.nabd.ai.local.ui.ChatScreen
+import com.nabd.ai.local.mtp_engine.ui.chat.NabdChatScreen
 import com.nabd.ai.local.ui.ChatViewModel
 import com.nabd.ai.local.ui.SettingsScreen
 import com.nabd.ai.local.ui.SettingsViewModel
@@ -37,12 +37,7 @@ fun AvantGardeAppLayout(appContainer: AppContainer) {
         factory = object : ViewModelProvider.Factory {
             override fun <T : ViewModel> create(modelClass: Class<T>): T {
                 @Suppress("UNCHECKED_CAST")
-                return ChatViewModel(
-                    appContainer.engine,
-                    appContainer.settingsRepository,
-                    appContainer.semanticRetriever,
-                    appContainer.knowledgeRetriever
-                ) as T
+                return appContainer.provideChatViewModel() as T
             }
         }
     )
@@ -73,8 +68,7 @@ fun AvantGardeAppLayout(appContainer: AppContainer) {
         ) { route ->
             when (route) {
                 is AppRoute.Chat -> {
-                    val uiState by chatViewModel.uiState.collectAsState()
-                    ChatScreen(uiState, chatViewModel::onIntent)
+                    NabdChatScreen(chatViewModel)
                 }
                 is AppRoute.Autonomy -> {
                     val agentRunner = appContainer.autonomousAgentRunner

@@ -13,5 +13,8 @@ data class InferenceConfig(
     val minP: Float = 0.05f,             // Exclude improbable paths (crucial llama.cpp feature)
     val maxTokens: Int = 2048,
     val repetitionPenalty: Float = 1.15f, // Prevent stereotypical repetition
-    val systemPrompt: String = NabdPersona.NUCLEAR_PROMPT
+    val systemPrompt: String = NabdPersona.NUCLEAR_PROMPT,
+    val webSearchEnabled: Boolean = false,
+    val shellEnabled: Boolean = false,
+    val memoryEnabled: Boolean = true
 )

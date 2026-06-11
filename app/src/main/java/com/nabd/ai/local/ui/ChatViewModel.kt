@@ -23,6 +23,7 @@ import kotlinx.coroutines.flow.*
 import kotlinx.coroutines.launch
 import java.util.UUID
 
+import com.nabd.ai.local.mtp_engine.architecture.SelectedAttachment
 import com.nabd.ai.local.mtp_engine.domain.tools.StreamingToolParser
 import com.nabd.ai.local.mtp_engine.domain.tools.ToolCommand
 
@@ -53,16 +54,22 @@ class ChatViewModel(
     private val _errorState = MutableStateFlow<GenerationError?>(null)
     private val _inferenceConfig = MutableStateFlow(InferenceConfig())
 
+    val selectedModel: StateFlow<String> = settingsRepository.activeModelPath
+        .map { it?.substringAfterLast("/") ?: "local:gguf-model" }
+        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), "local:gguf-model")
+
     // Compose state derived from internal managers
     override val state: StateFlow<ChatUiState> = combine(
         conversationManager.activePath,
         _isGenerating,
         _errorState,
-        _inferenceConfig
-    ) { messages, isGenerating, errorState, inferenceConfig ->
+        _inferenceConfig,
+        selectedModel
+    ) { messages, isGenerating, errorState, inferenceConfig, model ->
         ChatUiState(
             messages = messages,
             isGenerating = isGenerating,
+            selectedModel = model,
             errorState = errorState,
             inferenceConfig = inferenceConfig
         )
@@ -109,17 +116,20 @@ class ChatViewModel(
      */
     override fun dispatch(action: NabdAction) {
         when (action) {
-            is NabdAction.ProcessPrompt -> sendMessage(action.text)
+            is NabdAction.ProcessPrompt -> sendMessage(action.text, action.attachments)
             is NabdAction.EditMessage -> editMessage(action.messageId, action.newText)
             is NabdAction.SwitchBranch -> switchBranch(action.parentId, action.childId)
             is NabdAction.RetryGeneration -> retryGeneration(action.messageId)
             NabdAction.CancelGeneration -> cancelGeneration()
             is NabdAction.UpdateInferenceConfig -> _inferenceConfig.value = action.config
+            is NabdAction.ToggleWebSearch -> _inferenceConfig.value = _inferenceConfig.value.copy(webSearchEnabled = action.enabled)
+            is NabdAction.ToggleShell -> _inferenceConfig.value = _inferenceConfig.value.copy(shellEnabled = action.enabled)
+            is NabdAction.ToggleMemory -> _inferenceConfig.value = _inferenceConfig.value.copy(memoryEnabled = action.enabled)
         }
     }
 
-    private fun sendMessage(text: String) {
-        if (text.isBlank() || _isGenerating.value) return
+    private fun sendMessage(text: String, attachments: List<SelectedAttachment> = emptyList()) {
+        if ((text.isBlank() && attachments.isEmpty()) || _isGenerating.value) return
 
         val activePath = conversationManager.activePath.value
         val isRoot = activePath.isEmpty()
@@ -128,7 +138,8 @@ class ChatViewModel(
         val userMessage = ChatMessage(
             text = text, 
             participant = Participant.USER,
-            parentId = parentId
+            parentId = parentId,
+            attachments = attachments
         )
         val assistantPlaceholder = ChatMessage(
             text = "", 

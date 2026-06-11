@@ -21,7 +21,8 @@ import com.nabd.ai.local.rag.db.*
         KnowledgeChunkEntity::class,
         KnowledgeEmbeddingEntity::class,
         ConversationEntity::class,
-        MessageEntity::class
+        MessageEntity::class,
+        com.nabd.ai.local.mtp_engine.data.local.MessageEmbeddingEntity::class
     ], 
     version = 4
 )

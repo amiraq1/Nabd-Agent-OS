@@ -1,0 +1,1103 @@
+package com.nabd.ai.agora.viewmodel
+
+import android.app.Application
+import com.nabd.ai.agora.util.DebugLog
+import com.nabd.ai.agora.api.LlmProvider
+import com.nabd.ai.agora.api.ProviderConfig
+import com.nabd.ai.agora.api.StreamEvent
+import com.nabd.ai.agora.api.ToolDefinition
+import com.nabd.ai.agora.data.MemoryManager
+import com.nabd.ai.agora.data.local.ChatDao
+import com.nabd.ai.agora.data.local.MessageEntity
+import com.nabd.ai.agora.model.ChatMessage
+import com.nabd.ai.agora.model.MessageSegment
+import com.nabd.ai.agora.model.MessageStatus
+import com.nabd.ai.agora.model.Participant
+import com.nabd.ai.agora.model.ToolCallData
+import com.nabd.ai.R
+import com.nabd.ai.agora.service.AgoraForegroundService
+import com.nabd.ai.agora.service.AppForegroundTracker
+import com.nabd.ai.agora.api.EmbeddingClient
+import com.nabd.ai.agora.api.LlamaEngine
+import com.nabd.ai.agora.data.EmbeddingIndexer
+import com.nabd.ai.agora.util.Constants
+import com.nabd.ai.agora.util.SearchResultFormatter
+import com.nabd.ai.agora.tool.MemoryToolProvider
+import com.nabd.ai.agora.tool.RagToolProvider
+import com.nabd.ai.agora.tool.ShellToolProvider
+import com.nabd.ai.agora.tool.ToolProvider
+import com.nabd.ai.agora.tool.WebSearchToolProvider
+import kotlinx.coroutines.CancellationException
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.NonCancellable
+import kotlinx.coroutines.currentCoroutineContext
+import kotlinx.coroutines.flow.first
+import kotlinx.coroutines.isActive
+import kotlinx.coroutines.withContext
+import kotlinx.serialization.encodeToString
+import kotlinx.serialization.json.Json
+import kotlinx.serialization.json.JsonArray
+import kotlinx.serialization.json.JsonPrimitive
+import kotlinx.serialization.json.buildJsonArray
+import kotlinx.serialization.json.buildJsonObject
+import kotlinx.serialization.json.jsonArray
+import kotlinx.serialization.json.jsonObject
+import kotlinx.serialization.json.put
+import kotlinx.serialization.json.putJsonArray
+import kotlinx.serialization.json.putJsonObject
+import java.io.File
+import java.util.UUID
+
+data class GenerationConfig(
+    val providerName: String,
+    val modelId: String,
+    val apiKey: String,
+    val effectiveSystemPrompt: String?,
+    val maxContextWindow: Int,
+    val codeExecutionEnabled: Boolean,
+    val googleSearchEnabled: Boolean,
+    val thinkingEnabled: Boolean,
+    val thinkingLevel: String = "medium",
+    val baseUrl: String?,
+    val userPrepend: String? = null,
+    val userPostpend: String? = null,
+    val temperature: Float? = null,
+    val maxTokens: Int? = null,
+    val topP: Float? = null,
+    val frequencyPenalty: Float? = null,
+    val presencePenalty: Float? = null
+)
+
+data class GenerationContext(
+    val conversationId: String? = null,
+    val accessSavedMemories: Boolean = true,
+    val accessActiveMemory: Boolean = true,
+    val accessPastConversations: Boolean = true,
+    val modelSearchMethod: String = "keyword",
+    val activeEmbeddingConfig: com.nabd.ai.agora.data.EmbeddingModelConfig? = null,
+    val embeddingApiKey: String = "",
+    val ragThreshold: Float = 0.5f,
+    val searchMatchLimit: Int = 10,
+    val searchContextWindow: Int = 8,
+    val webSearchEnabled: Boolean = false,
+    val webSearchApiKeys: Map<String, String> = emptyMap(),
+    val webSearchProvider: String = "brave",
+    val webSearchNumResults: Int = 5,
+    val webSearchBaseUrl: String = "",
+    val shellEnabled: Boolean = false,
+    val shellDevices: List<com.nabd.ai.agora.data.ShellDeviceConfig> = emptyList(),
+    val sandboxEnabled: Boolean = false,
+    val imageTranscriptionEnabled: Boolean = false,
+    val imageTranscriptionModel: String? = null,
+    val imageTranscriptionBatchSize: Int = 3,
+    val transcriptionProviderName: String = "",
+    val transcriptionModelId: String = "",
+    val transcriptionApiKey: String = "",
+    val transcriptionBaseUrl: String? = null
+)
+
+class GenerationManager(
+    private val app: Application,
+    private val chatDao: ChatDao,
+    private val memoryManager: MemoryManager,
+    private val providers: Map<String, LlmProvider>,
+    private val context: android.content.Context,
+    private val sandboxFactory: com.nabd.ai.agora.sandbox.SandboxManagerFactory? = null
+) {
+    private var generationId = 0
+    var onMessagePersisted: ((messageId: String, text: String) -> Unit)? = null
+
+    private val memoryToolProvider = MemoryToolProvider(memoryManager)
+    private val webSearchToolProvider = WebSearchToolProvider()
+    private val ragToolProvider = RagToolProvider()
+    private val shellToolProvider = ShellToolProvider(sandboxFactory)
+    private val toolProviders: List<ToolProvider> = listOf(
+        memoryToolProvider, webSearchToolProvider, ragToolProvider, shellToolProvider
+    )
+
+    private val transcriptionManager = TranscriptionManager(providers, chatDao, context)
+
+    companion object {
+        private val FILE_TOOL_NAMES = setOf("file_read", "file_write", "file_edit", "file_glob", "file_grep")
+    }
+
+    private fun getProviderInstance(name: String): LlmProvider =
+        providers[name] ?: providers.values.first()
+
+    suspend fun processImages(
+        uris: List<String>,
+        sliceConfigs: Map<String, VideoSliceConfig> = emptyMap()
+    ): List<String> = withContext(Dispatchers.IO) {
+        uris.flatMap { uriString ->
+            try {
+                val uri = android.net.Uri.parse(uriString)
+                val mimeType = app.contentResolver.getType(uri)
+
+                when {
+                    mimeType?.startsWith("video/") == true -> {
+                        val config = sliceConfigs[uriString]
+                        val retriever = android.media.MediaMetadataRetriever()
+                        try {
+                        retriever.setDataSource(app, uri)
+                        val paths = mutableListOf<String>()
+
+                        if (config != null && config.frameCount > 1) {
+                            var timeUs = 0L
+                            for (i in 0 until config.frameCount) {
+                                val bitmap = retriever.getFrameAtTime(
+                                    timeUs, android.media.MediaMetadataRetriever.OPTION_CLOSEST
+                                )
+                                if (bitmap != null) {
+                                    val file = File(app.filesDir, "vid_${UUID.randomUUID()}_$i.jpg")
+                                    file.outputStream().use { out ->
+                                        bitmap.compress(android.graphics.Bitmap.CompressFormat.JPEG, 80, out)
+                                    }
+                                    bitmap.recycle()
+                                    paths.add(file.absolutePath)
+                                }
+                                timeUs += config.intervalMicros
+                            }
+                        } else {
+                            // Single frame (default behavior)
+                            val bitmap = retriever.frameAtTime
+                            if (bitmap != null) {
+                                val file = File(app.filesDir, "vid_${UUID.randomUUID()}.jpg")
+                                file.outputStream().use { out ->
+                                    bitmap.compress(android.graphics.Bitmap.CompressFormat.JPEG, 80, out)
+                                }
+                                bitmap.recycle()
+                                paths.add(file.absolutePath)
+                            }
+                        }
+                        paths
+                        } finally {
+                            retriever.release()
+                        }
+                    }
+                    mimeType?.startsWith("image/") == true || mimeType == null -> {
+                        val bytes = app.contentResolver.openInputStream(uri)?.use { it.readBytes() }
+                        if (bytes != null) {
+                            val options = android.graphics.BitmapFactory.Options().apply { inJustDecodeBounds = true }
+                            android.graphics.BitmapFactory.decodeByteArray(bytes, 0, bytes.size, options)
+
+                            var scale = 1
+                            while (options.outWidth / scale / 2 >= 1024 && options.outHeight / scale / 2 >= 1024) {
+                                scale *= 2
+                            }
+
+                            val decodeOptions = android.graphics.BitmapFactory.Options().apply { inSampleSize = scale }
+                            val bitmap = android.graphics.BitmapFactory.decodeByteArray(bytes, 0, bytes.size, decodeOptions)
+                            if (bitmap != null) {
+                                val file = File(app.filesDir, "img_${UUID.randomUUID()}.jpg")
+                                file.outputStream().use { out ->
+                                    bitmap.compress(android.graphics.Bitmap.CompressFormat.JPEG, 80, out)
+                                }
+                                bitmap.recycle()
+                                listOf(file.absolutePath)
+                            } else emptyList()
+                        } else emptyList()
+                    }
+                    else -> emptyList()
+                }
+            } catch (_: Exception) {
+                emptyList()
+            }
+        }
+    }
+
+    fun buildMemoryTools(ctx: GenerationContext): List<ToolDefinition> =
+        memoryToolProvider.definitions(ctx)
+
+    fun buildWebSearchTool(ctx: GenerationContext): List<ToolDefinition> =
+        webSearchToolProvider.definitions(ctx)
+
+    fun buildRagTool(ctx: GenerationContext): List<ToolDefinition> =
+        ragToolProvider.definitions(ctx)
+
+    fun buildShellTool(ctx: GenerationContext): List<ToolDefinition> {
+        val all = shellToolProvider.definitions(ctx)
+        return all.filter { it.function.name !in FILE_TOOL_NAMES }
+    }
+
+    fun buildFileTool(ctx: GenerationContext): List<ToolDefinition> {
+        val all = shellToolProvider.definitions(ctx)
+        return all.filter { it.function.name in FILE_TOOL_NAMES }
+    }
+
+    private data class SearchWindow(
+        val conversationId: String,
+        val conversationTitle: String,
+        val messages: List<MessageEntity>,
+        val topScore: Float,
+        val matchCount: Int
+    )
+
+    private suspend fun executeSearchConversations(arguments: String, ctx: GenerationContext): String {
+        val argsStr = arguments.ifBlank { "{}" }
+        val args = Json.decodeFromString<Map<String, kotlinx.serialization.json.JsonElement>>(argsStr)
+        val query = (args["query"] as? kotlinx.serialization.json.JsonPrimitive)?.content
+            ?: return buildJsonObject { put("type", "search_conversations"); put("error", "no_query") }.toString()
+        val limit = ((args["limit"] as? kotlinx.serialization.json.JsonPrimitive)?.content?.toIntOrNull() ?: ctx.searchMatchLimit).coerceIn(1, 30)
+        val n = ((args["context_window"] as? kotlinx.serialization.json.JsonPrimitive)?.content?.toIntOrNull() ?: ctx.searchContextWindow).coerceIn(4, 32)
+        val halfN = n / 2
+        val maxWindowSize = n * 3
+        val totalCap = 200
+
+        return try {
+            // Step 1: Search — normalize to List<Pair<MessageEntity, Float>>
+            val scoredResults: List<Pair<MessageEntity, Float>> = if (ctx.modelSearchMethod == "rag" && ctx.activeEmbeddingConfig != null) {
+                semanticSearch(query, limit, ctx)
+                    .filter { it.second >= ctx.ragThreshold }
+            } else {
+                chatDao.searchMessages(query, limit).map { it to 1.0f }
+            }
+            if (scoredResults.isEmpty())
+                return buildJsonObject { put("type", "search_conversations"); put("query", query); put("error", "no_results") }.toString()
+
+            // Exclude current conversation
+            val currentConvId = ctx.conversationId
+            val scoreByMessageId = scoredResults.associate { it.first.id to it.second }
+            val matchesByConv = scoredResults.filter { it.first.conversationId != currentConvId }
+                .groupBy({ it.first.conversationId }, { it.first.id })
+            if (matchesByConv.isEmpty())
+                return buildJsonObject { put("type", "search_conversations"); put("query", query); put("error", "no_results") }.toString()
+
+            // Step 2-4: For each conversation, build branch, expand windows, merge
+            val allWindows = mutableListOf<SearchWindow>()
+
+            for ((convId, matchIds) in matchesByConv) {
+                val conversation = chatDao.getConversation(convId) ?: continue
+                val allMsgs = chatDao.getMessagesForConversation(convId).first()
+                    .filter { it.participant in listOf(Participant.USER, Participant.MODEL) && it.text.isNotEmpty() }
+
+                // Build selected branch as indexed list
+                val branch = buildSelectedBranch(allMsgs, conversation.selectedBranchesJson)
+                val indexMap = branch.withIndex().associate { (i, m) -> m.id to i }
+                val branchMatchIds = matchIds.filter { it in indexMap }.toSet()
+
+                // For each match, expand window N/2 before and N/2 after
+                val windows = mutableListOf<Pair<IntRange, Float>>() // (range, score)
+                for (matchId in matchIds) {
+                    val centerIdx = indexMap[matchId] ?: continue
+                    val score = scoreByMessageId[matchId] ?: 1.0f
+                    val before = halfN.coerceAtMost(centerIdx)
+                    val after = halfN.coerceAtMost(branch.size - 1 - centerIdx)
+                    // Asymmetric fill: compensate short sides with extra from the other side
+                    val extraBefore = (halfN - before).coerceAtMost(branch.size - 1 - centerIdx - after)
+                    val extraAfter = (halfN - after - extraBefore).coerceAtLeast(0).coerceAtMost(centerIdx - before)
+                    val start = (centerIdx - before - extraAfter).coerceAtLeast(0)
+                    val end = (centerIdx + after + extraBefore).coerceAtMost(branch.size - 1)
+                    windows.add((start..end) to score)
+                }
+
+                // Merge overlapping windows within this conversation
+                val sorted = windows.sortedByDescending { it.second }
+                val merged = mutableListOf<Pair<IntRange, Float>>()
+                for ((range, score) in sorted) {
+                    var mergedRange = range
+                    val overlapIdx = merged.indexOfFirst { (existing, _) ->
+                        mergedRange.first <= existing.last + 1 && existing.first <= mergedRange.last + 1
+                    }
+                    if (overlapIdx >= 0) {
+                        val (existing, existingScore) = merged[overlapIdx]
+                        mergedRange = (minOf(mergedRange.first, existing.first)..maxOf(mergedRange.last, existing.last))
+                        merged[overlapIdx] = mergedRange to maxOf(score, existingScore)
+                    } else {
+                        merged.add(mergedRange to score)
+                    }
+                }
+                // Convert to SearchWindow, apply cap
+                for ((range, score) in merged) {
+                    var cappedRange = range
+                    if (range.last - range.first + 1 > maxWindowSize) {
+                        val centerId = branchMatchIds.maxByOrNull { scoreByMessageId[it] ?: 0f }
+                        val centerIdx = if (centerId != null) indexMap[centerId]!! else (range.first + range.last) / 2
+                        cappedRange = ((centerIdx - halfN).coerceAtLeast(range.first)..(centerIdx + halfN).coerceAtMost(range.last))
+                    }
+                    val windowMsgIds = branch.subList(cappedRange.first, cappedRange.last + 1).map { it.id }.toSet()
+                    val matchedInWindow = branchMatchIds.count { it in windowMsgIds }
+                    allWindows.add(SearchWindow(
+                        conversationId = convId,
+                        conversationTitle = conversation.title,
+                        messages = cappedRange.map { branch[it] },
+                        topScore = score,
+                        matchCount = matchedInWindow
+                    ))
+                }
+            }
+
+            // Step 5: Sort by topScore desc, cap total messages
+            val finalWindows = mutableListOf<SearchWindow>()
+            var totalMessages = 0
+            for (window in allWindows.sortedByDescending { it.topScore }) {
+                if (totalMessages >= totalCap) break
+                val available = totalCap - totalMessages
+                if (window.messages.size > available) {
+                    finalWindows.add(window.copy(messages = window.messages.take(available)))
+                    totalMessages = totalCap
+                } else {
+                    finalWindows.add(window)
+                    totalMessages += window.messages.size
+                }
+            }
+
+            // Step 6: Format output
+            val resultArray = buildJsonArray {
+                for (window in finalWindows) {
+                    add(buildJsonObject {
+                        put("title", window.conversationTitle)
+                        put("conversation_id", window.conversationId)
+                        put("top_score", window.topScore)
+                        put("match_count", window.matchCount)
+                        putJsonArray("messages") {
+                            val dateFormat = java.text.SimpleDateFormat("yyyy-MM-dd HH:mm:ss", java.util.Locale.US)
+                            for (msg in window.messages) {
+                                add(buildJsonObject {
+                                    put("participant", msg.participant.name)
+                                    put("text", msg.text)
+                                    put("timestamp", dateFormat.format(java.util.Date(msg.timestamp)))
+                                })
+                            }
+                        }
+                    })
+                }
+            }
+            buildJsonObject {
+                put("type", "search_conversations")
+                put("query", query)
+                put("results", resultArray)
+            }.toString()
+        } catch (e: Exception) {
+            buildJsonObject {
+                put("type", "search_conversations")
+                put("query", query)
+                put("error", "search_error")
+                put("message", e.message ?: "")
+            }.toString()
+        }
+    }
+
+    private suspend fun executeListConversations(arguments: String, ctx: GenerationContext): String {
+        val argsStr = arguments.ifBlank { "{}" }
+        val args = Json.decodeFromString<Map<String, kotlinx.serialization.json.JsonElement>>(argsStr)
+        val order = ((args["order"] as? kotlinx.serialization.json.JsonPrimitive)?.content ?: "desc").lowercase()
+        val limit = ((args["limit"] as? kotlinx.serialization.json.JsonPrimitive)?.content?.toIntOrNull() ?: 20).coerceIn(1, 50)
+        val offset = ((args["offset"] as? kotlinx.serialization.json.JsonPrimitive)?.content?.toIntOrNull() ?: 0).coerceAtLeast(0)
+
+        return try {
+            val allConversations = chatDao.getAllConversationsList()
+            val sorted = if (order == "desc") allConversations.reversed() else allConversations
+            val total = sorted.size
+            val page = if (offset < total) {
+                sorted.subList(offset, (offset + limit).coerceAtMost(total))
+            } else {
+                emptyList()
+            }
+            val hasMore = offset + limit < total
+
+            buildJsonObject {
+                put("type", "list_conversations")
+                put("total", total)
+                put("offset", offset)
+                put("limit", limit)
+                put("has_more", hasMore)
+                putJsonArray("conversations") {
+                    val dateFormat = java.text.SimpleDateFormat("yyyy-MM-dd HH:mm:ss", java.util.Locale.US)
+                    for (conv in page) {
+                        add(buildJsonObject {
+                            put("id", conv.id)
+                            put("title", conv.title)
+                            put("timestamp", dateFormat.format(java.util.Date(conv.lastUpdated)))
+                        })
+                    }
+                }
+            }.toString()
+        } catch (e: Exception) {
+            buildJsonObject {
+                put("type", "list_conversations")
+                put("error", "list_error")
+                put("message", e.message ?: "")
+            }.toString()
+        }
+    }
+
+    private suspend fun executeReadConversation(arguments: String, ctx: GenerationContext): String {
+        val argsStr = arguments.ifBlank { "{}" }
+        val args = Json.decodeFromString<Map<String, kotlinx.serialization.json.JsonElement>>(argsStr)
+        val conversationId = ((args["conversation_id"] as? kotlinx.serialization.json.JsonPrimitive)?.content ?: "").trim()
+        if (conversationId.isEmpty()) {
+            return buildJsonObject {
+                put("type", "read_conversation")
+                put("error", "missing_conversation_id")
+            }.toString()
+        }
+        val limit = ((args["limit"] as? kotlinx.serialization.json.JsonPrimitive)?.content?.toIntOrNull() ?: 50).coerceIn(1, 100)
+        val offset = ((args["offset"] as? kotlinx.serialization.json.JsonPrimitive)?.content?.toIntOrNull() ?: 0).coerceAtLeast(0)
+
+        return try {
+            val conversation = chatDao.getConversation(conversationId)
+                ?: return buildJsonObject {
+                    put("type", "read_conversation")
+                    put("conversation_id", conversationId)
+                    put("error", "not_found")
+                }.toString()
+
+            val allMessages = chatDao.getMessagesForConversation(conversationId).first()
+                .filter { it.participant in listOf(Participant.USER, Participant.MODEL) }
+            // buildSelectedBranch needs all intermediate nodes to walk the tree without gaps;
+            // text emptiness check is deferred: tool-only MODEL msgs must stay as parent-chain links.
+            val branch = buildSelectedBranch(allMessages, conversation.selectedBranchesJson)
+                .filter { !it.id.startsWith(Constants.TOOL_MSG_PREFIX) && !it.id.startsWith(Constants.RESULT_MSG_PREFIX) }
+            val totalMessages = branch.size
+            val page = if (offset < totalMessages) {
+                branch.subList(offset, (offset + limit).coerceAtMost(totalMessages))
+            } else {
+                emptyList()
+            }
+            val hasMore = offset + limit < totalMessages
+
+            buildJsonObject {
+                put("type", "read_conversation")
+                put("conversation_id", conversationId)
+                put("title", conversation.title)
+                put("total_messages", totalMessages)
+                put("offset", offset)
+                put("limit", limit)
+                put("has_more", hasMore)
+                putJsonArray("messages") {
+                    val dateFormat = java.text.SimpleDateFormat("yyyy-MM-dd HH:mm:ss", java.util.Locale.US)
+                    for (msg in page) {
+                        add(buildJsonObject {
+                            put("participant", msg.participant.name)
+                            put("text", msg.text)
+                            put("timestamp", dateFormat.format(java.util.Date(msg.timestamp)))
+                        })
+                    }
+                }
+            }.toString()
+        } catch (e: Exception) {
+            buildJsonObject {
+                put("type", "read_conversation")
+                put("conversation_id", conversationId)
+                put("error", "read_error")
+                put("message", e.message ?: "")
+            }.toString()
+        }
+    }
+
+    /**
+     * Reconstruct the user-selected message branch for a conversation.
+     * Uses selectedBranchesJson (Map<parentId → childId>) to walk from root to leaf.
+     */
+    private fun buildSelectedBranch(
+        allMessages: List<MessageEntity>,
+        selectedBranchesJson: String?
+    ): List<MessageEntity> {
+        val selections: Map<String?, String> = try {
+            val raw = Json.decodeFromString<Map<String, String>>(selectedBranchesJson ?: "{}")
+            raw.mapKeys { if (it.key == "null") null else it.key }
+        } catch (_: Exception) { emptyMap() }
+
+        val byParent = allMessages.groupBy { it.parentId }
+        val path = mutableListOf<MessageEntity>()
+        var parentId: String? = null
+        while (true) {
+            val siblings = byParent[parentId] ?: break
+            if (siblings.isEmpty()) break
+            val selectedId = selections[parentId]
+            val visible = siblings.filter {
+                !it.id.startsWith(Constants.TOOL_MSG_PREFIX) && !it.id.startsWith(Constants.RESULT_MSG_PREFIX)
+            }
+            val chosen = if (visible.isNotEmpty()) {
+                visible.find { it.id == selectedId } ?: visible.last()
+            } else {
+                siblings.find { it.id == selectedId } ?: siblings.last()
+            }
+            path.add(chosen)
+            parentId = chosen.id
+        }
+        return path
+    }
+
+    suspend fun semanticSearch(query: String, limit: Int, ctx: GenerationContext): List<Pair<com.nabd.ai.agora.data.local.MessageEntity, Float>> = withContext(Dispatchers.IO) {
+        val config = ctx.activeEmbeddingConfig
+        if (config == null) {
+            DebugLog.w("AgoraVM", "GM RAG: no active embedding config")
+            return@withContext emptyList()
+        }
+        val queryEmbedding = if (config.type == com.nabd.ai.agora.data.EmbeddingModelType.LOCAL) {
+            if (!LlamaEngine.isModelReady(config.localFilePath)) {
+                DebugLog.w("AgoraVM", "GM RAG: local model not ready")
+                return@withContext emptyList()
+            }
+            LlamaEngine.computeEmbedding(query, config.localFilePath)
+        } else {
+            val apiKey = resolveEmbeddingApiKey(ctx)
+            if (apiKey == null) {
+                DebugLog.w("AgoraVM", "GM RAG: no API key")
+                return@withContext emptyList()
+            }
+            EmbeddingClient.computeEmbedding(
+                text = query,
+                apiKey = apiKey,
+                model = config.remoteModelName,
+                baseUrl = config.remoteBaseUrl.ifBlank { "https://api.openai.com/v1" }
+            )
+        }
+        if (queryEmbedding == null) {
+            DebugLog.w("AgoraVM", "GM RAG: failed to compute query embedding")
+            return@withContext emptyList()
+        }
+
+        val all = chatDao.getEmbeddingsByModel(config.id)
+        DebugLog.d("AgoraVM", "GM RAG: ${all.size} stored embeddings, query dim=${queryEmbedding.size}")
+        if (all.isEmpty()) return@withContext emptyList()
+
+        val scored = all.map {
+            val stored = EmbeddingIndexer.bytesToFloats(it.embedding)
+            it to EmbeddingIndexer.cosineSimilarity(queryEmbedding, stored)
+        }
+        val best = scored.maxOfOrNull { it.second } ?: 0f
+        DebugLog.d("AgoraVM", "GM RAG: best cosine = ${"%.4f".format(best)}")
+        val aboveThreshold = scored.filter { it.second > ctx.ragThreshold }
+        val messagesById = chatDao.getMessagesByIds(aboveThreshold.map { it.first.messageId }).associateBy { it.id }
+        val filtered = aboveThreshold
+            .filter { (messagesById[it.first.messageId]?.text?.length ?: 0) >= 10 }
+            .sortedByDescending { it.second }
+            .take(limit)
+        filtered.mapNotNull { (embedding, score) -> messagesById[embedding.messageId]?.let { it to score } }
+    }
+
+    private fun resolveEmbeddingApiKey(ctx: GenerationContext): String? {
+        return ctx.embeddingApiKey.ifBlank { null }
+    }
+
+    private suspend fun executeTool(name: String, arguments: String, ctx: GenerationContext): String {
+        return try {
+            for (provider in toolProviders) {
+                if (provider.handles(name)) {
+                    return provider.execute(name, arguments, ctx)
+                }
+            }
+            when (name) {
+                "search_conversations" -> executeSearchConversations(arguments, ctx)
+                "list_conversations" -> executeListConversations(arguments, ctx)
+                "read_conversation" -> executeReadConversation(arguments, ctx)
+                else -> "Unknown tool: $name"
+            }
+        } catch (e: Exception) {
+            "Error executing tool '$name': ${e.localizedMessage ?: "Unknown error"}"
+        }
+    }
+
+    private fun applyUserTemplate(messages: List<ChatMessage>, prepend: String?, postpend: String?): List<ChatMessage> {
+        if (prepend == null && postpend == null) return messages
+        val timeSdf = java.text.SimpleDateFormat("HH:mm:ss", java.util.Locale.US)
+        val dateSdf = java.text.SimpleDateFormat("yyyy-MM-dd", java.util.Locale.US)
+        return messages.map { msg ->
+            if (msg.participant == Participant.USER && msg.text.isNotEmpty()) {
+                val ts = java.util.Date(msg.timestamp)
+                val rp = prepend?.replace("{sent_time}", timeSdf.format(ts))?.replace("{sent_date}", dateSdf.format(ts)) ?: ""
+                val ra = postpend?.replace("{sent_time}", timeSdf.format(ts))?.replace("{sent_date}", dateSdf.format(ts)) ?: ""
+                if (rp.isEmpty() && ra.isEmpty()) msg
+                else msg.copy(text = rp + msg.text + ra)
+            } else msg
+        }
+    }
+
+    private fun buildLiveSegments(flushed: List<MessageSegment>, buf: StringBuilder, signature: String? = null): List<MessageSegment>? {
+        val result = flushed.toMutableList()
+        if (buf.isNotEmpty()) {
+            result.add(MessageSegment(type = "thought", content = buf.toString(), signature = signature))
+        }
+        return result.ifEmpty { null }
+    }
+
+    private suspend fun buildApiPath(
+        parentId: String?,
+        conversationId: String,
+        isRegenerate: Boolean,
+        replaceMessageId: String?,
+        config: GenerationConfig,
+        ctx: GenerationContext
+    ): Pair<List<ChatMessage>, ProviderConfig> {
+        val dbMessages = chatDao.getMessagesForConversation(conversationId).first()
+        val pathEntities = mutableListOf<MessageEntity>()
+        var currId: String? = parentId
+        while (currId != null) {
+            val msg = dbMessages.find { it.id == currId } ?: break
+            pathEntities.add(0, msg)
+            currId = msg.parentId
+        }
+        // Inject tool call chains that are children of messages in the ancestor path.
+        val expanded = mutableListOf<MessageEntity>()
+        for (entity in pathEntities) {
+            val toolChildren = dbMessages
+                .filter { it.parentId == entity.id && it.id.startsWith(Constants.TOOL_MSG_PREFIX) }
+                .sortedBy { it.timestamp }
+            if (toolChildren.isEmpty()) {
+                expanded.add(entity)
+            } else {
+                for (toolMsg in toolChildren) {
+                    expanded.add(toolMsg)
+                    val pending = mutableListOf(toolMsg)
+                    var safety = 0
+                    while (pending.isNotEmpty() && safety < 100) {
+                        val current = pending.removeAt(0)
+                        val children = dbMessages
+                            .filter { it.parentId == current.id && (it.id.startsWith(Constants.RESULT_MSG_PREFIX) || it.id.startsWith(Constants.TOOL_MSG_PREFIX)) }
+                            .sortedBy { it.timestamp }
+                        for (child in children) {
+                            val isResult = child.id.startsWith(Constants.RESULT_MSG_PREFIX)
+                            if (isResult) {
+                                // Include result_ messages so providers can emit
+                                // correct tool_use/tool_result pairs. The result
+                                // data lives in TOOL_MSG segments too, but Anthropic
+                                // requires separate tool_result blocks in the next
+                                // user-role message.
+                                if (child !in expanded) {
+                                    expanded.add(child)
+                                }
+                                pending.add(child)
+                            } else if (child !in expanded) {
+                                expanded.add(child)
+                                pending.add(child)
+                            }
+                        }
+                        safety++
+                    }
+                }
+                expanded.add(entity.copy(toolCallJson = null))
+            }
+        }
+        val currentPath = expanded.map {
+            val segs = it.toolCallJson?.let { json -> try { Json.decodeFromString<List<MessageSegment>>(json) } catch (_: Exception) { null } }
+            val toolCall = segs?.lastOrNull { s -> s.type == "tool" }?.let { s ->
+                ToolCallData(s.toolName ?: "", s.toolArgs ?: "{}", s.toolResult ?: "", s.toolCallId)
+            }
+            val meta = it.attachmentMeta?.let { json -> try { Json.decodeFromString<com.nabd.ai.agora.model.AttachmentMeta>(json) } catch (_: Exception) { null } }
+            val combinedText = if (meta != null && it.participant == Participant.USER) {
+                val attachmentText = meta.items.mapNotNull { item ->
+                    val content = item.textContent
+                    val transcription = item.transcription
+                    val includeTranscription = ctx.imageTranscriptionEnabled && transcription != null && transcription.isNotBlank()
+                    when {
+                        content != null -> {
+                            val label = item.fileName ?: "file"
+                            "\n\n--- File: $label ---\n$content"
+                        }
+                        includeTranscription -> {
+                            val label = item.fileName ?: "image"
+                            "\n\n--- Image Transcription: $label ---\n$transcription"
+                        }
+                        else -> null
+                    }
+                }.joinToString("")
+                it.text + attachmentText
+            } else it.text
+            val hasTranscription = ctx.imageTranscriptionEnabled && meta != null && meta.items.any { item -> !item.transcription.isNullOrBlank() }
+            val effectiveImages = if (hasTranscription) emptyList() else it.images
+            ChatMessage(id = it.id, parentId = it.parentId, text = combinedText, images = effectiveImages, thoughts = it.thoughts, thoughtTitle = it.thoughtTitle, tokenCount = it.tokenCount, status = it.status, participant = it.participant, timestamp = it.timestamp, thoughtTimeMs = it.thoughtTimeMs, segments = segs, toolCall = toolCall)
+        }.filter { it.participant != Participant.ERROR }
+            .let { path ->
+                if (isRegenerate && replaceMessageId != null) {
+                    val oldIdx = path.indexOfFirst { it.id == replaceMessageId }
+                    if (oldIdx >= 0) path.take(oldIdx) else path
+                } else path
+            }
+
+        val memoryTools = buildMemoryTools(ctx)
+        val webSearchTool = buildWebSearchTool(ctx)
+        val ragTool = buildRagTool(ctx)
+        val shellTool = buildShellTool(ctx)
+        val fileTool = buildFileTool(ctx)
+        val allTools = memoryTools + webSearchTool + ragTool + shellTool + fileTool
+        val providerConfig = ProviderConfig(
+            apiKey = config.apiKey,
+            modelId = config.modelId,
+            systemPrompt = config.effectiveSystemPrompt,
+            maxContextWindow = config.maxContextWindow,
+            codeExecutionEnabled = config.codeExecutionEnabled,
+            googleSearchEnabled = config.googleSearchEnabled,
+            thinkingEnabled = config.thinkingEnabled,
+            thinkingLevel = config.thinkingLevel,
+            baseUrl = config.baseUrl,
+            tools = allTools,
+            userPrepend = config.userPrepend,
+            userPostpend = config.userPostpend,
+            temperature = config.temperature,
+            maxTokens = config.maxTokens,
+            topP = config.topP,
+            frequencyPenalty = config.frequencyPenalty,
+            presencePenalty = config.presencePenalty
+        )
+        return Pair(currentPath, providerConfig)
+    }
+
+    suspend fun generate(
+        conversationId: String,
+        modelMessageId: String,
+        startTime: Long,
+        isRegenerate: Boolean,
+        replaceMessageId: String?,
+        modelName: String,
+        config: GenerationConfig,
+        ctx: GenerationContext,
+        generationJob: kotlinx.coroutines.Job?,
+        onStreamUpdate: (ChatMessage) -> Unit,
+        onLoadingChange: (Boolean) -> Unit,
+        onGeneratingIdChange: (String?) -> Unit,
+        onStreamClear: () -> Unit
+    ) {
+        generationId++
+        val myGenerationId = generationId
+
+        val provider = getProviderInstance(config.providerName)
+
+        onLoadingChange(true)
+        onGeneratingIdChange(conversationId)
+        withContext(Dispatchers.Main) { AgoraForegroundService.start(app) }
+
+        var totalText = ""
+        var totalThoughts = ""
+        var totalThoughtTitle: String? = null
+        var totalTokenCount = 0
+        var totalThoughtTimeMs: Long? = null
+        var cumulativeThoughtMs: Long = 0
+        var currentThoughtStartMs: Long? = null
+        var currentStatus = MessageStatus.SENDING
+        var retryText: String? = null
+        val segments = mutableListOf<MessageSegment>()
+        var currentThoughtBuf = StringBuilder()
+        var currentThoughtSignature: String? = null
+        val placeholder = chatDao.getMessagesForConversation(conversationId).first().find { it.id == modelMessageId }
+        val parentId = placeholder?.parentId
+        var toolPath = emptyList<ChatMessage>()
+
+        try {
+            // Stage 1: Image Transcription
+            var transcriptionPerformed = false
+            if (ctx.imageTranscriptionEnabled && ctx.transcriptionModelId.isNotEmpty()) {
+                kotlinx.coroutines.delay(500) // let foreground service fully start
+                val targets = transcriptionManager.collectTargets(conversationId, parentId)
+                if (targets.isNotEmpty()) {
+                    val (transcriptionSegments, transcriptionError) = transcriptionManager.transcribe(
+                        targets, conversationId,
+                        ctx.transcriptionProviderName, ctx.transcriptionModelId,
+                        ctx.transcriptionApiKey, ctx.transcriptionBaseUrl,
+                        generationJob, modelMessageId, startTime, onStreamUpdate
+                    )
+                    if (transcriptionError != null) {
+                        totalText = transcriptionError
+                        currentStatus = MessageStatus.ERROR
+                        transcriptionPerformed = true
+                    } else {
+                        segments.addAll(0, transcriptionSegments)
+                        transcriptionPerformed = true
+                    }
+                }
+            }
+
+            if (currentStatus != MessageStatus.ERROR) {
+            val (currentPath, rawProviderConfig) = buildApiPath(parentId, conversationId, isRegenerate, replaceMessageId, config, ctx)
+            val providerConfig = if (transcriptionPerformed) rawProviderConfig.copy(includeImages = false) else rawProviderConfig
+
+            var toolCallData: ToolCallData? = null
+            var toolCallDataList: List<ToolCallData> = emptyList()
+            val roundToolSegments = mutableListOf<MessageSegment>()
+
+            var lastEmitMs = 0L
+
+            fun modelMessage() = ChatMessage(
+                id = modelMessageId, parentId = parentId,
+                text = totalText, thoughts = totalThoughts.ifBlank { null },
+                thoughtTitle = totalThoughtTitle, tokenCount = totalTokenCount,
+                status = currentStatus, participant = Participant.MODEL,
+                timestamp = startTime, thoughtTimeMs = totalThoughtTimeMs,
+                modelName = modelName, toolCall = toolCallData,
+                segments = buildLiveSegments(segments, currentThoughtBuf, currentThoughtSignature),
+                retryText = retryText
+            )
+
+            suspend fun handleStreamEvent(event: StreamEvent) {
+                when (event) {
+                    is StreamEvent.TextChunk -> {
+                        if (currentStatus == MessageStatus.THINKING) {
+                            if (currentThoughtStartMs != null) {
+                                cumulativeThoughtMs += System.currentTimeMillis() - currentThoughtStartMs!!
+                                currentThoughtStartMs = null
+                            }
+                            totalThoughtTimeMs = cumulativeThoughtMs
+                            if (currentThoughtBuf.isNotEmpty()) {
+                                segments.add(MessageSegment(type = "thought", content = currentThoughtBuf.toString(), signature = currentThoughtSignature))
+                                currentThoughtBuf = StringBuilder()
+                                currentThoughtSignature = null
+                            }
+                            totalText += event.text.trimStart()
+                        } else {
+                            totalText += event.text
+                        }
+                        currentStatus = MessageStatus.SENDING
+                        retryText = null
+                    }
+                    is StreamEvent.ThoughtChunk -> {
+                        currentStatus = MessageStatus.THINKING
+                        retryText = null
+                        if (currentThoughtStartMs == null) {
+                            currentThoughtStartMs = System.currentTimeMillis()
+                        }
+                        if (totalThoughts.isEmpty()) totalThoughts = "Thinking..."
+                        if (event.thought.isNotEmpty()) {
+                            currentThoughtBuf.append(event.thought)
+                            if (totalThoughts == "Thinking...") totalThoughts = event.thought
+                            else totalThoughts += event.thought
+                        }
+                        if (event.title != null) totalThoughtTitle = event.title
+                        if (event.signature != null) currentThoughtSignature = event.signature
+                    }
+                    is StreamEvent.UsageUpdate -> {
+                        if (event.tokenCount > 0) totalTokenCount = event.tokenCount
+                        if (totalText.isEmpty() && event.thoughtsTokenCount > 0) {
+                            currentStatus = MessageStatus.THINKING
+                            if (currentThoughtStartMs == null) {
+                                currentThoughtStartMs = System.currentTimeMillis()
+                            }
+                            if (totalThoughts.isEmpty()) totalThoughts = "Thinking..."
+                        }
+                    }
+                    is StreamEvent.Retrying -> {
+                        retryText = context.getString(R.string.generation_retry_attempt, event.attempt, event.maxAttempts)
+                        onStreamUpdate(modelMessage())
+                    }
+                    is StreamEvent.Error -> {
+                        retryText = null
+                        if (toolCallData == null && toolCallDataList.isEmpty()) {
+                            totalText = event.message
+                            currentStatus = MessageStatus.ERROR
+                        }
+                    }
+                    is StreamEvent.ToolCallRequest -> {
+                        if (currentThoughtBuf.isNotEmpty()) {
+                            segments.add(MessageSegment(type = "thought", content = currentThoughtBuf.toString(), signature = currentThoughtSignature))
+                            currentThoughtBuf = StringBuilder()
+                            currentThoughtSignature = null
+                        }
+                        if (currentThoughtStartMs != null) {
+                            cumulativeThoughtMs += System.currentTimeMillis() - currentThoughtStartMs!!
+                            currentThoughtStartMs = null
+                        }
+                        totalThoughtTimeMs = cumulativeThoughtMs
+                        val ts = MessageSegment(type = "tool", toolName = event.name, toolArgs = event.arguments, toolResult = null, toolCallId = event.id, signature = event.signature)
+                        segments.add(ts)
+                        currentStatus = MessageStatus.TOOL_CALLING
+                        onStreamUpdate(modelMessage())
+                        lastEmitMs = System.currentTimeMillis()
+                        val result = executeTool(event.name, event.arguments, ctx)
+                        val clipped = result.take(Constants.MAX_TOOL_RESULT_LENGTH)
+                        val idx = segments.indexOfLast { it.toolCallId == event.id }
+                        if (idx >= 0) {
+                            segments[idx] = segments[idx].copy(toolResult = clipped)
+                            roundToolSegments.add(segments[idx])
+                        }
+                        val tcd = ToolCallData(event.name, event.arguments, clipped, event.signature, event.id)
+                        if (toolCallData == null) toolCallData = tcd
+                        toolCallDataList = toolCallDataList + tcd
+                        currentStatus = MessageStatus.SENDING
+                        onStreamUpdate(modelMessage())
+                        lastEmitMs = System.currentTimeMillis()
+                    }
+                    is StreamEvent.ToolCallsRequest -> {
+                        if (currentThoughtBuf.isNotEmpty()) {
+                            segments.add(MessageSegment(type = "thought", content = currentThoughtBuf.toString(), signature = currentThoughtSignature))
+                            currentThoughtBuf = StringBuilder()
+                            currentThoughtSignature = null
+                        }
+                        if (currentThoughtStartMs != null) {
+                            cumulativeThoughtMs += System.currentTimeMillis() - currentThoughtStartMs!!
+                            currentThoughtStartMs = null
+                        }
+                        totalThoughtTimeMs = cumulativeThoughtMs
+                        event.calls.forEach { call ->
+                            segments.add(MessageSegment(type = "tool", toolName = call.name, toolArgs = call.arguments, toolResult = null, toolCallId = call.id, signature = call.signature))
+                        }
+                        currentStatus = MessageStatus.TOOL_CALLING
+                        onStreamUpdate(modelMessage())
+                        lastEmitMs = System.currentTimeMillis()
+                        val tcds = event.calls.map { call ->
+                            val result = executeTool(call.name, call.arguments, ctx)
+                            val clipped = result.take(Constants.MAX_TOOL_RESULT_LENGTH)
+                            val idx = segments.indexOfLast { it.toolCallId == call.id }
+                            if (idx >= 0) {
+                                segments[idx] = segments[idx].copy(toolResult = clipped)
+                                roundToolSegments.add(segments[idx])
+                            }
+                            ToolCallData(call.name, call.arguments, clipped, call.signature, call.id)
+                        }
+                        toolCallData = tcds.firstOrNull()
+                        toolCallDataList = tcds
+                        currentStatus = MessageStatus.SENDING
+                        onStreamUpdate(modelMessage())
+                        lastEmitMs = System.currentTimeMillis()
+                    }
+                }
+
+                val now = System.currentTimeMillis()
+                val isSignificant = event is StreamEvent.Error
+                if (now - lastEmitMs >= 500 || isSignificant) {
+                    onStreamUpdate(modelMessage())
+                    lastEmitMs = now
+                }
+            }
+
+            val apiPath = applyUserTemplate(currentPath, config.userPrepend, config.userPostpend)
+            provider.generateResponse(apiPath, providerConfig).collect { event ->
+                handleStreamEvent(event)
+            }
+            // Always emit final state after collection completes
+            if (generationJob?.isCancelled != true) {
+                onStreamUpdate(modelMessage())
+            }
+
+            // Multi-tool loop
+            var toolRound = 0
+            toolPath = currentPath
+
+            while (toolCallDataList.isNotEmpty() && currentStatus != MessageStatus.ERROR && currentCoroutineContext().isActive) {
+                toolRound++
+                val roundToolList = roundToolSegments.toList()
+                roundToolSegments.clear()
+                val thoughtSegs = segments.filter { it.type == "thought" }
+                val txedSegments = if (thoughtSegs.isNotEmpty()) thoughtSegs + roundToolList else roundToolList
+                val prevLastId = if (toolRound == 1) modelMessageId else toolPath.lastOrNull()?.id
+                val toolMsgId = "${Constants.TOOL_MSG_PREFIX}${UUID.randomUUID()}"
+                val toolMsgSegs = txedSegments.ifEmpty { null }
+                val tcds = toolCallDataList
+                val allSegmentsJson = Json.encodeToString(toolMsgSegs ?: tcds.map { tc ->
+                    MessageSegment(type = "tool", toolName = tc.toolName, toolArgs = tc.arguments, toolResult = tc.result, signature = tc.signature, toolCallId = tc.toolCallId)
+                })
+                val resultMsgs = tcds.map { tcData ->
+                    val rid = "${Constants.RESULT_MSG_PREFIX}${UUID.randomUUID()}"
+                    val displayText = SearchResultFormatter.format(tcData.result, context)
+                    rid to ChatMessage(
+                        id = rid, parentId = toolMsgId,
+                        text = displayText,
+                        participant = Participant.USER, status = MessageStatus.SUCCESS,
+                        toolCall = tcData
+                    )
+                }
+                toolPath = toolPath.toMutableList().apply {
+                    add(ChatMessage(
+                        id = toolMsgId, parentId = prevLastId,
+                        text = "", participant = Participant.MODEL,
+                        status = MessageStatus.SUCCESS, toolCall = tcds.first(),
+                        segments = toolMsgSegs
+                    ))
+                    for ((_, msg) in resultMsgs) add(msg)
+                }
+                chatDao.upsertMessage(MessageEntity(
+                    id = toolMsgId, conversationId = conversationId, parentId = prevLastId,
+                    text = "", thoughts = null, status = MessageStatus.SUCCESS,
+                    participant = Participant.MODEL, timestamp = System.currentTimeMillis(),
+                    toolCallJson = allSegmentsJson
+                ))
+                for ((index, entry) in resultMsgs.withIndex()) {
+                    val (rid, _) = entry
+                    chatDao.upsertMessage(MessageEntity(
+                        id = rid, conversationId = conversationId, parentId = toolMsgId,
+                        text = tcds[index].result, thoughts = null, status = MessageStatus.SUCCESS,
+                        participant = Participant.USER, timestamp = System.currentTimeMillis(),
+                        toolCallJson = Json.encodeToString(listOf(
+                            MessageSegment(type = "tool", toolName = tcds[index].toolName, toolArgs = tcds[index].arguments, toolResult = tcds[index].result, signature = tcds[index].signature, toolCallId = tcds[index].toolCallId)
+                        ))
+                    ))
+                }
+
+                toolCallData = null
+                toolCallDataList = emptyList()
+
+                lastEmitMs = 0L
+
+                val apiToolPath = applyUserTemplate(toolPath, config.userPrepend, config.userPostpend)
+                provider.generateResponse(apiToolPath, providerConfig).collect { event ->
+                    handleStreamEvent(event)
+                }
+                // Always emit final state after tool round completes
+                onStreamUpdate(modelMessage())
+            }
+
+            if (!currentCoroutineContext().isActive) {
+                currentStatus = MessageStatus.STOPPED
+            }
+
+            if (!isRegenerate && generationId == myGenerationId) for (msg in toolPath) {
+                if (msg.id.startsWith(Constants.TOOL_MSG_PREFIX) || msg.id.startsWith(Constants.RESULT_MSG_PREFIX)) {
+                    val exists = chatDao.getMessagesForConversation(conversationId).first().any { it.id == msg.id }
+                    if (!exists) {
+                        chatDao.upsertMessage(MessageEntity(
+                            id = msg.id, conversationId = conversationId, parentId = msg.parentId,
+                            text = msg.text, thoughts = null, status = msg.status,
+                            participant = msg.participant, timestamp = System.currentTimeMillis(),
+                            toolCallJson = msg.segments?.let { Json.encodeToString(it) }
+                                ?: msg.toolCall?.let { Json.encodeToString(listOf(
+                                    MessageSegment(type = "tool", toolName = it.toolName, toolArgs = it.arguments, toolResult = it.result, signature = it.signature, toolCallId = it.toolCallId)
+                                )) }
+                        ))
+                    }
+                }
+            }
+
+            if (currentStatus != MessageStatus.ERROR) {
+                currentStatus = if (totalText.isNotEmpty() || totalThoughts.isNotEmpty()) MessageStatus.SUCCESS else MessageStatus.ERROR
+            }
+            if (generationJob?.isCancelled == true && currentStatus != MessageStatus.ERROR) {
+                currentStatus = MessageStatus.STOPPED
+            }
+            } // else { // called buildApiPath when currentStatus == ERROR
+        } catch (e: CancellationException) {
+            currentStatus = MessageStatus.STOPPED
+            throw e
+        } catch (e: Exception) {
+            val isCancelled = generationJob?.isCancelled == true
+            currentStatus = if (isCancelled) MessageStatus.STOPPED else MessageStatus.ERROR
+            if (!isCancelled) {
+                totalText = "Error: ${e.localizedMessage ?: "An unexpected error occurred."}"
+            }
+        } finally {
+            val cancelledExternally = generationJob?.isCancelled == true
+            withContext(NonCancellable) {
+                try {
+                    if (generationId == myGenerationId) {
+                        val conversationExists = chatDao.getConversation(conversationId) != null
+                        if (conversationExists) {
+                            val finalSegments = buildLiveSegments(segments, currentThoughtBuf, currentThoughtSignature)
+                                ?: segments.toList().ifEmpty { null }
+                            val segmentsJson = finalSegments?.let { Json.encodeToString(it) }
+                            val effectiveParentId = parentId
+                            chatDao.upsertMessage(MessageEntity(
+                                id = modelMessageId, conversationId = conversationId, parentId = effectiveParentId,
+                                text = totalText, thoughts = totalThoughts.ifBlank { null },
+                                thoughtTitle = totalThoughtTitle, tokenCount = totalTokenCount,
+                                status = currentStatus, participant = Participant.MODEL, timestamp = startTime,
+                                thoughtTimeMs = totalThoughtTimeMs, modelName = modelName, toolCallJson = segmentsJson
+                            ))
+                            if (totalText.isNotBlank()) {
+                                onMessagePersisted?.invoke(modelMessageId, totalText)
+                            }
+                        }
+                    }
+                } catch (e: Exception) {
+                    DebugLog.e("AgoraVM", "Failed to persist message to DB", e)
+                }
+                if (generationId == myGenerationId && !cancelledExternally) {
+                    onStreamClear()
+                    onLoadingChange(false)
+                    onGeneratingIdChange(null)
+                }
+                AgoraForegroundService.stop(app)
+                if (!AppForegroundTracker.isInForeground && currentStatus == MessageStatus.SUCCESS && totalText.isNotBlank()) {
+                    AgoraForegroundService.showCompletionNotification(app, totalText)
+                }
+            }
+        }
+    }
+}

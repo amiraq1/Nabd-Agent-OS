@@ -36,7 +36,12 @@ data class MessageEntity(
     val parentId: String?, // Points to parent message forming the tree structure
     val text: String,
     val participant: String, // String representation of Participant Enum
-    val timestamp: Long
+    val timestamp: Long,
+    val status: String? = null,
+    val thoughts: String? = null,
+    val thoughtTitle: String? = null,
+    val modelName: String? = null,
+    val attachmentsJson: String? = null
 )
 
 /**

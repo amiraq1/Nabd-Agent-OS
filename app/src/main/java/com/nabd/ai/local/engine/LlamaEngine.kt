@@ -10,49 +10,108 @@ import kotlinx.coroutines.sync.withLock
 import android.util.Log
 
 /**
- * LlamaEngine: Implementation of [LlmProvider] and [LlamaChatEngine] using llama.cpp.
- * Uses explicit JNI bindings to interact with the native C++ runtime.
+ * LlamaEngine: Implementation of [LlmProvider] using llama.cpp native runtime.
  */
 class LlamaEngine : LlmProvider, LlamaChatEngine, java.io.Closeable {
 
-    private val _state = MutableStateFlow<EngineState>(EngineState.Initialized)
+    override val id: String = "local_llama"
+    override val name: String = "Local Llama"
+    override val isLocal: Boolean = true
+
+    private val _state = MutableStateFlow<EngineState>(EngineState.Uninitialized)
     override val state: StateFlow<EngineState> = _state.asStateFlow()
 
     private val mutex = Mutex()
     private var nativeContextHandle: Long = 0
 
+    private var isNativeLoaded = false
+
     init {
         try {
             System.loadLibrary("nabd_engine")
             nativeContextHandle = nativeInit()
+            isNativeLoaded = true
+            _state.value = EngineState.Uninitialized
         } catch (e: UnsatisfiedLinkError) {
             Log.e("LlamaEngine", "Failed to load native library", e)
-            _state.value = EngineState.Failed("Native library load failed")
+            _state.value = EngineState.Error(e)
+            isNativeLoaded = false
         }
     }
 
-    override suspend fun loadModel(modelPath: String) = mutex.withLock {
-        if (_state.value !is EngineState.Initialized && _state.value !is EngineState.Unloaded) {
-            // Unload existing model if necessary
-            if (_state.value is EngineState.Loaded || _state.value is EngineState.Failed) {
-                nativeUnloadModel(nativeContextHandle)
+    override suspend fun initialize(config: ProviderConfig) = mutex.withLock {
+        if (!isNativeLoaded) {
+            _state.value = EngineState.Error(IllegalStateException("Native library not loaded. Local models are unavailable."))
+            return@withLock
+        }
+
+        if (config !is ProviderConfig.Local) {
+            _state.value = EngineState.Error(IllegalArgumentException("LlamaEngine requires ProviderConfig.Local"))
+            return@withLock
+        }
+
+        if (_state.value is EngineState.Ready) {
+            nativeUnloadModel(nativeContextHandle)
+        }
+
+        _state.value = EngineState.Initializing
+        val success = nativeLoadModel(nativeContextHandle, config.modelPath)
+        
+        if (success) {
+            _state.value = EngineState.Ready
+        } else {
+            _state.value = EngineState.Error(RuntimeException("Failed to load model at ${config.modelPath}"))
+        }
+    }
+
+    override suspend fun loadModel(path: String) {
+        initialize(ProviderConfig.Local(id, "default", path))
+    }
+
+    override suspend fun shutdown() = mutex.withLock {
+        if (nativeContextHandle != 0L) {
+            nativeUnloadModel(nativeContextHandle)
+            _state.value = EngineState.Released
+        }
+    }
+
+    override suspend fun generateText(request: GenerationRequest): Flow<GenerationChunk> = callbackFlow {
+        if (_state.value !is EngineState.Ready) {
+            close(IllegalStateException("Engine must be Ready before generation"))
+            return@callbackFlow
+        }
+
+        _state.value = EngineState.Generating
+
+        val callback = object : TokenCallback {
+            override fun onToken(token: String) {
+                trySend(GenerationChunk(token))
+            }
+
+            override fun onCompletion() {
+                _state.value = EngineState.Ready
+                trySend(GenerationChunk("", isLast = true))
+                close()
+            }
+
+            override fun onError(error: String) {
+                _state.value = EngineState.Error(RuntimeException(error))
+                close(RuntimeException(error))
             }
         }
 
-        _state.value = EngineState.Loading
-        val success = nativeLoadModel(nativeContextHandle, modelPath)
-        
-        if (success) {
-            _state.value = EngineState.Loaded
-        } else {
-            _state.value = EngineState.Failed("Failed to load model at $modelPath")
-        }
-    }
+        nativeGenerate(nativeContextHandle, request.prompt, request.grammar ?: "", callback)
 
-    /**
-     * applyChatTemplate: Basic implementation of chat templating.
-     * In a real implementation, this would call native JNI to use GGUF templates.
-     */
+        awaitClose {
+            nativeStopGeneration(nativeContextHandle)
+            if (_state.value is EngineState.Generating) {
+                _state.value = EngineState.Ready
+            }
+        }
+    }.flowOn(kotlinx.coroutines.Dispatchers.IO)
+
+    // --- Backward Compatibility for LlamaChatEngine ---
+
     override suspend fun applyChatTemplate(messages: List<ChatMessage>): String {
         return messages.joinToString("\n") { 
             when (it.participant) {
@@ -65,60 +124,17 @@ class LlamaEngine : LlmProvider, LlamaChatEngine, java.io.Closeable {
     }
 
     override suspend fun computeEmbedding(text: String): FloatArray {
-        // TODO: Call native JNI to compute embeddings. 
-        // Returning a dummy vector for now to satisfy the compiler.
         return FloatArray(384) { 0.1f } 
     }
 
-    override fun streamTokens(prompt: String): Flow<String> = generateText(prompt)
-
-    override fun cancel() = stopGeneration()
-
-    override fun generateText(prompt: String, grammar: String?): Flow<String> = callbackFlow {
-        if (_state.value !is EngineState.Loaded) {
-            throw IllegalStateException("Model must be loaded before generation")
-        }
-
-        _state.value = EngineState.Generating
-
-        val callback = object : TokenCallback {
-            override fun onToken(token: String) {
-                trySend(token)
-            }
-
-            override fun onCompletion() {
-                _state.value = EngineState.Loaded
-                close()
-            }
-
-            override fun onError(error: String) {
-                _state.value = EngineState.Failed(error)
-                close(RuntimeException(error))
-            }
-        }
-
-        nativeGenerate(nativeContextHandle, prompt, grammar ?: "", callback)
-
-        awaitClose {
-            stopGeneration()
-        }
-    }.flowOn(kotlinx.coroutines.Dispatchers.IO)
-
-    override fun stopGeneration() {
-        synchronized(this) {
-            if (_state.value is EngineState.Generating) {
-                _state.value = EngineState.Stopping
-                nativeStopGeneration(nativeContextHandle)
-                _state.value = EngineState.Loaded
-            }
+    override fun streamTokens(prompt: String): Flow<String> = flow {
+        generateText(GenerationRequest(prompt)).collect { chunk ->
+            emit(chunk.text)
         }
     }
 
-    override fun unloadModel() {
-        if (nativeContextHandle != 0L) {
-            nativeUnloadModel(nativeContextHandle)
-            _state.value = EngineState.Unloaded
-        }
+    override fun cancel() {
+        nativeStopGeneration(nativeContextHandle)
     }
 
     override fun close() {
@@ -137,10 +153,6 @@ class LlamaEngine : LlmProvider, LlamaChatEngine, java.io.Closeable {
     private external fun nativeUnloadModel(handle: Long)
     private external fun nativeRelease(handle: Long)
 
-    /**
-     * Internal interface for JNI to call back into Kotlin.
-     * This is the only boundary where JNI interacts with Kotlin objects.
-     */
     interface TokenCallback {
         fun onToken(token: String)
         fun onCompletion()

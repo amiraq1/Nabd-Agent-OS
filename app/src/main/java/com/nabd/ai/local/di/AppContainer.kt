@@ -42,7 +42,21 @@ class AppContainer(private val context: Context) {
 
     val settingsRepository by lazy { SettingsRepository(context) }
     val modelManager by lazy { ModelManager(context) }
-    val engine by lazy { com.nabd.ai.local.engine.EngineManager(settingsRepository) }
+    
+    val secureKeyManager by lazy { com.nabd.ai.local.core.SecureKeyManager(context) }
+    
+    val providerRegistry by lazy { 
+        com.nabd.ai.local.engine.DefaultProviderRegistry().apply {
+            register(com.nabd.ai.local.engine.LlamaEngine())
+            register(com.nabd.ai.local.engine.OpenAIEngine(secureKeyManager))
+            register(com.nabd.ai.local.engine.GeminiEngine(secureKeyManager))
+            register(com.nabd.ai.local.engine.AnthropicEngine(secureKeyManager))
+        }
+    }
+
+    val engine by lazy { 
+        com.nabd.ai.local.engine.EngineManager(settingsRepository, providerRegistry) 
+    }
 
     val database by lazy { MemoryDatabase.getDatabase(context) }
     
@@ -158,13 +172,26 @@ class AppContainer(private val context: Context) {
     val executionTimeline by lazy { ExecutionTimeline() }
     val resourceMonitor by lazy { ResourceMonitor(context) }
 
+    val sandbox by lazy { com.nabd.ai.local.autonomy.safety.ToolSandbox(workspaceManager.workspaceRoot) }
+
     val toolOrchestrator by lazy {
-        ToolOrchestrator(engine, toolRegistry, approvalManager)
+        ToolOrchestrator(engine, toolRegistry, approvalManager, sandbox)
+    }
+
+    val knowledgeMemory by lazy { com.nabd.ai.local.autonomy.memory.KnowledgeMemory() }
+    
+    val multiAgentCoordinator by lazy {
+        com.nabd.ai.local.autonomy.coordination.MultiAgentCoordinator().apply {
+            registerAgent(com.nabd.ai.local.autonomy.coordination.PlannerAgent(planner = taskPlanner))
+            registerAgent(com.nabd.ai.local.autonomy.coordination.ExecutorAgent(orchestrator = toolOrchestrator))
+            registerAgent(com.nabd.ai.local.autonomy.coordination.ReviewerAgent(reflectionEngine = reflectionEngine))
+            registerAgent(com.nabd.ai.local.autonomy.coordination.ReflectionAgent(replanningManager = replanningManager))
+        }
     }
 
     val autonomousAgentRunner by lazy {
         AutonomousAgentRunner(
-            taskPlanner, reflectionEngine, replanningManager, toolOrchestrator, sessionManager, executionGuardrails, executionTimeline, resourceMonitor
+            multiAgentCoordinator, replanningManager, sessionManager, executionGuardrails, executionTimeline, resourceMonitor
         )
     }
 
@@ -181,6 +208,6 @@ class AppContainer(private val context: Context) {
     }
 
     fun provideSettingsViewModel(): com.nabd.ai.local.ui.SettingsViewModel {
-        return com.nabd.ai.local.ui.SettingsViewModel(modelManager, settingsRepository, knowledgeIngestionManager, database)
+        return com.nabd.ai.local.ui.SettingsViewModel(modelManager, settingsRepository, secureKeyManager, knowledgeIngestionManager, database)
     }
 }

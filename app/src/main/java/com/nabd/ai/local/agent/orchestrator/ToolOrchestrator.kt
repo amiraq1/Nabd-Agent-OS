@@ -9,7 +9,9 @@ import com.nabd.ai.local.agent.tools.filesystem.WriteFileTool
 import com.nabd.ai.local.agent.trace.ExecutionTrace
 import com.nabd.ai.local.agent.trace.TraceEntry
 import com.nabd.ai.local.agent.trace.TraceType
+import com.nabd.ai.local.autonomy.safety.ToolSandbox
 import com.nabd.ai.local.engine.LlmProvider
+import com.nabd.ai.local.engine.GenerationRequest
 import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
@@ -20,7 +22,8 @@ import org.json.JSONObject
 class ToolOrchestrator(
     private val provider: LlmProvider,
     private val toolRegistry: ToolRegistry,
-    private val approvalManager: ApprovalManager
+    private val approvalManager: ApprovalManager,
+    private val sandbox: ToolSandbox? = null
 ) {
     private val _state = MutableStateFlow<AgentExecutionState>(AgentExecutionState.Idle)
     val state: StateFlow<AgentExecutionState> = _state.asStateFlow()
@@ -54,11 +57,12 @@ class ToolOrchestrator(
 
             var generatedJson = ""
             try {
-                val tokens = mutableListOf<String>()
-                provider.generateText(currentContext, jsonGrammar).collect {
-                    tokens.add(it)
-                }
-                generatedJson = tokens.joinToString("")
+                generatedJson = provider.generateResponse(
+                    GenerationRequest(
+                        prompt = currentContext,
+                        grammar = jsonGrammar
+                    )
+                )
                 addTrace(TraceType.THOUGHT, "Generated JSON: ${'$'}generatedJson")
             } catch (e: Exception) {
                 addTrace(TraceType.ERROR, "Generation failed: ${'$'}{e.message}")
@@ -102,6 +106,15 @@ class ToolOrchestrator(
     }
 
     private suspend fun dispatchTool(name: String, params: String): String {
+        // 1. Sandbox Validation
+        sandbox?.let {
+            if (!it.validateCommand(params)) {
+                it.auditLog(name, params, allowed = false)
+                return "Error: Command rejected by sandbox for security reasons."
+            }
+            it.auditLog(name, params, allowed = true)
+        }
+
         val tool = toolRegistry.getTool(name) ?: run {
             val errorMsg = "Error: Tool not found: ${'$'}name"
             addTrace(TraceType.ERROR, errorMsg)

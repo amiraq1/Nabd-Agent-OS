@@ -34,7 +34,8 @@ fun SettingsScreen(
     onDeleteDocument: (String) -> Unit,
     onProviderSelect: (com.nabd.ai.local.engine.ProviderType) -> Unit,
     onOpenAiKeyChange: (String) -> Unit,
-    onGeminiKeyChange: (String) -> Unit
+    onGeminiKeyChange: (String) -> Unit,
+    onAnthropicKeyChange: (String) -> Unit
 ) {
     val modelLauncher = rememberLauncherForActivityResult(
         contract = ActivityResultContracts.OpenDocument()
@@ -60,7 +61,7 @@ fun SettingsScreen(
         }
 
         when (selectedTab) {
-            0 -> ProvidersTab(uiState, onProviderSelect, onOpenAiKeyChange, onGeminiKeyChange)
+            0 -> ProvidersTab(uiState, onProviderSelect, onOpenAiKeyChange, onGeminiKeyChange, onAnthropicKeyChange)
             1 -> ModelsTab(uiState, modelLauncher, onSelect, onDelete)
             2 -> KnowledgeTab(uiState, docLauncher, onDeleteDocument)
         }
@@ -72,7 +73,8 @@ fun ProvidersTab(
     uiState: SettingsUiState,
     onProviderSelect: (com.nabd.ai.local.engine.ProviderType) -> Unit,
     onOpenAiKeyChange: (String) -> Unit,
-    onGeminiKeyChange: (String) -> Unit
+    onGeminiKeyChange: (String) -> Unit,
+    onAnthropicKeyChange: (String) -> Unit
 ) {
     LazyColumn(
         contentPadding = PaddingValues(16.dp),
@@ -103,21 +105,30 @@ fun ProvidersTab(
             Text("API Keys", style = MaterialTheme.typography.titleMedium)
         }
         item {
-            OutlinedTextField(
-                value = uiState.openAiApiKey ?: "",
-                onValueChange = onOpenAiKeyChange,
-                label = { Text("OpenAI API Key") },
-                modifier = Modifier.fillMaxWidth(),
-                singleLine = true
+            var localOpenAiKey by remember { mutableStateOf(uiState.openAiApiKey ?: "") }
+            com.nabd.ai.local.ui.components.ProviderKeyInput(
+                providerName = "OpenAI",
+                currentKey = localOpenAiKey,
+                onKeyChanged = { localOpenAiKey = it },
+                onSave = { onOpenAiKeyChange(localOpenAiKey) }
             )
         }
         item {
-            OutlinedTextField(
-                value = uiState.geminiApiKey ?: "",
-                onValueChange = onGeminiKeyChange,
-                label = { Text("Gemini API Key") },
-                modifier = Modifier.fillMaxWidth(),
-                singleLine = true
+            var localGeminiKey by remember { mutableStateOf(uiState.geminiApiKey ?: "") }
+            com.nabd.ai.local.ui.components.ProviderKeyInput(
+                providerName = "Gemini",
+                currentKey = localGeminiKey,
+                onKeyChanged = { localGeminiKey = it },
+                onSave = { onGeminiKeyChange(localGeminiKey) }
+            )
+        }
+        item {
+            var localAnthropicKey by remember { mutableStateOf(uiState.anthropicApiKey ?: "") }
+            com.nabd.ai.local.ui.components.ProviderKeyInput(
+                providerName = "Anthropic",
+                currentKey = localAnthropicKey,
+                onKeyChanged = { localAnthropicKey = it },
+                onSave = { onAnthropicKeyChange(localAnthropicKey) }
             )
         }
     }

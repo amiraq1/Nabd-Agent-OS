@@ -19,34 +19,34 @@ import okhttp3.Response
 import org.json.JSONObject
 import org.json.JSONArray
 import java.util.concurrent.TimeUnit
+import android.util.Log
 
 /**
- * OpenAIEngine: Implementation of [LlmProvider] for OpenAI compatible APIs.
+ * AnthropicEngine: Implementation of [LlmProvider] for Anthropic Claude APIs.
  */
-class OpenAIEngine(
+class AnthropicEngine(
     private val secureKeyManager: SecureKeyManager
 ) : LlmProvider {
 
-    override val id: String = "openai"
-    override val name: String = "OpenAI"
+    override val id: String = "anthropic"
+    override val name: String = "Anthropic"
     override val isLocal: Boolean = false
 
     private val _state = MutableStateFlow<EngineState>(EngineState.Uninitialized)
     override val state: StateFlow<EngineState> = _state.asStateFlow()
 
     private var client: OkHttpClient? = null
-    private var modelId: String = "gpt-4o-mini"
+    private var modelId: String = "claude-3-5-sonnet-20240620"
 
     override suspend fun initialize(config: ProviderConfig) {
         if (config !is ProviderConfig.Cloud) {
-            _state.value = EngineState.Error(IllegalArgumentException("OpenAIEngine requires ProviderConfig.Cloud"))
+            _state.value = EngineState.Error(IllegalArgumentException("AnthropicEngine requires ProviderConfig.Cloud"))
             return
         }
 
         _state.value = EngineState.Initializing
         this.modelId = config.modelId
 
-        // Build client with AuthInterceptor
         client = OkHttpClient.Builder()
             .readTimeout(0, TimeUnit.MILLISECONDS)
             .addInterceptor(AuthInterceptor(secureKeyManager, id))
@@ -69,6 +69,7 @@ class OpenAIEngine(
         _state.value = EngineState.Generating
         
         val jsonMediaType = "application/json; charset=utf-8".toMediaType()
+        
         val messages = JSONArray().apply {
             put(JSONObject().apply {
                 put("role", "user")
@@ -79,14 +80,16 @@ class OpenAIEngine(
         val requestBodyJson = JSONObject().apply {
             put("model", modelId)
             put("messages", messages)
+            put("max_tokens", request.maxTokens)
             put("stream", true)
             put("temperature", request.temperature)
-            put("max_tokens", request.maxTokens)
+            // System prompt could be added here if supported in GenerationRequest
         }
 
         val httpRequest = Request.Builder()
-            .url("https://api.openai.com/v1/chat/completions")
+            .url("https://api.anthropic.com/v1/messages")
             .header("Accept", "text/event-stream")
+            // Note: AuthInterceptor adds x-api-key and anthropic-version headers
             .post(requestBodyJson.toString().toRequestBody(jsonMediaType))
             .build()
 
@@ -94,34 +97,53 @@ class OpenAIEngine(
         
         val eventSource = factory.newEventSource(httpRequest, object : EventSourceListener() {
             override fun onEvent(eventSource: EventSource, id: String?, type: String?, data: String) {
-                if (data == "[DONE]") {
-                    _state.value = EngineState.Ready
-                    trySend(GenerationChunk("", isLast = true))
-                    close()
-                    return
-                }
                 try {
+                    // Anthropic uses different event types: message_start, content_block_delta, message_delta, etc.
                     val json = JSONObject(data)
-                    val choices = json.optJSONArray("choices")
-                    if (choices != null && choices.length() > 0) {
-                        val delta = choices.getJSONObject(0).optJSONObject("delta")
-                        val content = delta?.optString("content", "") ?: ""
-                        if (content.isNotEmpty()) {
-                            trySend(GenerationChunk(content))
+                    
+                    when (json.optString("type")) {
+                        "content_block_delta" -> {
+                            val delta = json.optJSONObject("delta")
+                            if (delta?.optString("type") == "text_delta") {
+                                val text = delta.optString("text", "")
+                                if (text.isNotEmpty()) {
+                                    trySend(GenerationChunk(text))
+                                }
+                            }
+                        }
+                        "message_stop" -> {
+                            _state.value = EngineState.Ready
+                            trySend(GenerationChunk("", isLast = true))
+                            close()
+                        }
+                        "error" -> {
+                            val errorObj = json.optJSONObject("error")
+                            val msg = errorObj?.optString("message") ?: "Unknown API Error"
+                            _state.value = EngineState.Error(RuntimeException(msg))
+                            close(RuntimeException(msg))
                         }
                     }
                 } catch (e: Exception) {
-                    // Ignore parse errors on partial chunks
+                    // Ignore parse errors on partial/unhandled event types
                 }
             }
 
             override fun onFailure(eventSource: EventSource, t: Throwable?, response: Response?) {
-                _state.value = EngineState.Error(t ?: RuntimeException("Unknown SSE Error"))
-                close(t)
+                val errorMsg = if (response != null) {
+                    "HTTP ${response.code}: ${response.message}"
+                } else {
+                    t?.message ?: "Unknown SSE Error"
+                }
+                Log.e("AnthropicEngine", "SSE Failure: $errorMsg", t)
+                _state.value = EngineState.Error(RuntimeException(errorMsg, t))
+                close(t ?: RuntimeException(errorMsg))
             }
 
             override fun onClosed(eventSource: EventSource) {
-                _state.value = EngineState.Ready
+                if (_state.value is EngineState.Generating) {
+                    _state.value = EngineState.Ready
+                    trySend(GenerationChunk("", isLast = true))
+                }
                 close()
             }
         })

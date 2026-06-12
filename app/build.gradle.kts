@@ -59,6 +59,7 @@ android {
             excludes += "/META-INF/{AL2.0,LGPL2.1}"
         }
     }
+
     /*
     externalNativeBuild {
         cmake {
@@ -112,6 +113,9 @@ dependencies {
     implementation("com.squareup.okhttp3:okhttp:4.12.0")
     implementation("com.squareup.okhttp3:okhttp-sse:4.12.0")
     
+    // Security
+    implementation("androidx.security:security-crypto:1.1.0-alpha06")
+
     // PDF Parsing
     implementation("com.tom-roush:pdfbox-android:2.0.27.0")
     

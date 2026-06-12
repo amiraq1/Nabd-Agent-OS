@@ -1,13 +1,13 @@
 package com.nabd.ai.local.autonomy.runtime
 
-import com.nabd.ai.local.agent.orchestrator.ToolOrchestrator
+import com.nabd.ai.local.autonomy.coordination.MultiAgentCoordinator
+import com.nabd.ai.local.autonomy.coordination.AgentRole
+import com.nabd.ai.local.autonomy.coordination.AgentMessage
 import com.nabd.ai.local.autonomy.history.EventType
 import com.nabd.ai.local.autonomy.history.ExecutionTimeline
 import com.nabd.ai.local.autonomy.planning.ExecutionPlan
 import com.nabd.ai.local.autonomy.planning.PlanStep
 import com.nabd.ai.local.autonomy.planning.StepState
-import com.nabd.ai.local.autonomy.planning.TaskPlanner
-import com.nabd.ai.local.autonomy.reflection.ReflectionEngine
 import com.nabd.ai.local.autonomy.replanning.ReplanningManager
 import com.nabd.ai.local.autonomy.resources.ResourceMonitor
 import com.nabd.ai.local.autonomy.safety.ExecutionGuardrails
@@ -18,10 +18,8 @@ import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.delay
 
 class AutonomousAgentRunner(
-    private val planner: TaskPlanner,
-    private val reflectionEngine: ReflectionEngine,
+    private val coordinator: MultiAgentCoordinator,
     private val replanningManager: ReplanningManager,
-    private val orchestrator: ToolOrchestrator,
     private val sessionManager: SessionManager,
     private val guardrails: ExecutionGuardrails,
     private val timeline: ExecutionTimeline,
@@ -47,12 +45,16 @@ class AutonomousAgentRunner(
         timeline.addEvent(EventType.PLAN_CREATED, "Received goal: ${goal.take(50)}...")
         
         _state.value = AutonomousExecutionState.PLANNING
-        val plan = planner.generatePlan(goal, emptyList()) // Pass tools list properly in real usage
+        
+        // Delegate planning to PlannerAgent via Coordinator
+        val planningResponse = coordinator.routeTask(AgentRole.PLANNER, goal)
+        val plan = planningResponse.metadata["plan"] as ExecutionPlan
+        
         session.currentPlan = plan
         _currentPlan.value = plan
         sessionManager.save()
         
-        timeline.addEvent(EventType.PLAN_CREATED, "Generated plan with ${plan.steps.size} steps.")
+        timeline.addEvent(EventType.PLAN_CREATED, "Generated plan via MultiAgentCoordinator.")
         
         runLoop(plan)
     }
@@ -122,30 +124,34 @@ class AutonomousAgentRunner(
             plan.updateStepState(nextStep.id, StepState.IN_PROGRESS)
             sessionManager.save()
 
-            // Map the step objective into a prompt for the ToolOrchestrator
-            val prompt = "Objective: ${nextStep.objective}\nDefinition of Done: ${nextStep.definitionOfDone}\nExecute this step using the available tools."
+            // 1. Execute step via ExecutorAgent
+            val executorResponse = coordinator.routeTask(
+                AgentRole.EXECUTOR,
+                "Objective: ${nextStep.objective}\nDefinition of Done: ${nextStep.definitionOfDone}"
+            )
+            val orchestratorTrace = executorResponse.content
             
-            // Execute the Tool Orchestrator loop (which itself is a ReAct loop bounded by maxIterations)
-            orchestrator.runLoop(prompt)
-            
-            // Collect the final trace from the orchestrator to pass to reflection
-            val orchestratorTrace = orchestrator.trace.value.entries.joinToString("\n") { "${it.type}: ${it.content}" }
-            
+            // 2. Review results via ReviewerAgent
             _state.value = AutonomousExecutionState.REFLECTING
             timeline.addEvent(EventType.REFLECTION_EVALUATED, "Evaluating step results...")
             
-            val eval = reflectionEngine.evaluateStep(nextStep, orchestratorTrace)
+            val reviewerResponse = coordinator.routeTask(
+                AgentRole.REVIEWER,
+                orchestratorTrace
+            )
             
-            if (eval.isSuccess) {
+            val eval = reviewerResponse.metadata["eval"] as? com.nabd.ai.local.autonomy.reflection.EvaluationResult
+            
+            if (eval?.isSuccess == true) {
                 guardrails.recordSuccess()
                 plan.updateStepState(nextStep.id, StepState.COMPLETED, observation = orchestratorTrace)
                 timeline.addEvent(EventType.STEP_COMPLETED, "Step completed successfully.")
             } else {
                 guardrails.recordFailure()
-                plan.updateStepState(nextStep.id, StepState.FAILED, error = eval.reasoning)
-                timeline.addEvent(EventType.STEP_FAILED, "Step failed: ${eval.reasoning}")
+                plan.updateStepState(nextStep.id, StepState.FAILED, error = eval?.reasoning ?: "Unknown failure")
+                timeline.addEvent(EventType.STEP_FAILED, "Step failed: ${eval?.reasoning}")
                 
-                if (eval.suggestedCorrections.isNotEmpty()) {
+                if (eval?.suggestedCorrections?.isNotEmpty() == true) {
                     guardrails.recordReplan()
                     timeline.addEvent(EventType.REPLAN_TRIGGERED, "Replanning to apply corrections...")
                     val updatedPlan = replanningManager.insertCorrections(plan, nextStep.id, eval.suggestedCorrections)

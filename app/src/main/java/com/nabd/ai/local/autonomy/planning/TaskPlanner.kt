@@ -1,6 +1,7 @@
 package com.nabd.ai.local.autonomy.planning
 
 import com.nabd.ai.local.engine.LlmProvider
+import com.nabd.ai.local.engine.GenerationRequest
 import org.json.JSONArray
 import org.json.JSONObject
 import java.util.UUID
@@ -26,11 +27,12 @@ class TaskPlanner(
             Return ONLY a valid JSON object matching the strict schema.
         """.trimIndent()
 
-        val tokens = mutableListOf<String>()
-        provider.generateText(prompt, planningGrammar).collect {
-            tokens.add(it)
-        }
-        val generatedJson = tokens.joinToString("")
+        val generatedJson = provider.generateResponse(
+            GenerationRequest(
+                prompt = prompt,
+                grammar = planningGrammar
+            )
+        )
 
         return parsePlanJson(generatedJson, goal)
     }

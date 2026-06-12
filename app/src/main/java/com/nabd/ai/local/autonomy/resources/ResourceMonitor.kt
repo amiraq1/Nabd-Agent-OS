@@ -6,6 +6,9 @@ import android.content.IntentFilter
 import android.os.BatteryManager
 import android.app.ActivityManager
 
+/**
+ * ResourceMonitor: Tracks system resources and provides safeguards for LLM execution.
+ */
 class ResourceMonitor(private val context: Context) {
     
     fun isBatteryCriticallyLow(): Boolean {
@@ -22,11 +25,20 @@ class ResourceMonitor(private val context: Context) {
     }
 
     fun isMemoryCriticallyLow(): Boolean {
+        val memoryInfo = getMemoryInfo()
+        return memoryInfo.lowMemory
+    }
+
+    fun getMemoryInfo(): ActivityManager.MemoryInfo {
         val activityManager = context.getSystemService(Context.ACTIVITY_SERVICE) as ActivityManager
         val memoryInfo = ActivityManager.MemoryInfo()
         activityManager.getMemoryInfo(memoryInfo)
-        
-        return memoryInfo.lowMemory
+        return memoryInfo
+    }
+
+    fun getRamUsageBytes(): Long {
+        val info = getMemoryInfo()
+        return info.totalMem - info.availMem
     }
 
     fun shouldPauseExecution(): Boolean {

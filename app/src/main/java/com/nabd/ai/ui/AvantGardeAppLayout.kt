@@ -46,12 +46,7 @@ fun AvantGardeAppLayout(appContainer: AppContainer) {
         factory = object : ViewModelProvider.Factory {
             override fun <T : ViewModel> create(modelClass: Class<T>): T {
                 @Suppress("UNCHECKED_CAST")
-                return SettingsViewModel(
-                    appContainer.modelManager,
-                    appContainer.settingsRepository,
-                    appContainer.knowledgeIngestionManager,
-                    appContainer.database
-                ) as T
+                return appContainer.provideSettingsViewModel() as T
             }
         }
     )
@@ -102,7 +97,8 @@ fun AvantGardeAppLayout(appContainer: AppContainer) {
                         onDeleteDocument = settingsViewModel::deleteDocument,
                         onProviderSelect = settingsViewModel::setProvider,
                         onOpenAiKeyChange = settingsViewModel::setOpenAiApiKey,
-                        onGeminiKeyChange = settingsViewModel::setGeminiApiKey
+                        onGeminiKeyChange = settingsViewModel::setGeminiApiKey,
+                        onAnthropicKeyChange = settingsViewModel::setAnthropicApiKey
                     )
                 }
             }

@@ -2,6 +2,7 @@ package com.nabd.ai.local.autonomy.reflection
 
 import com.nabd.ai.local.autonomy.planning.PlanStep
 import com.nabd.ai.local.engine.LlmProvider
+import com.nabd.ai.local.engine.GenerationRequest
 import org.json.JSONObject
 
 class ReflectionEngine(
@@ -28,10 +29,13 @@ class ReflectionEngine(
             Return ONLY a valid JSON object matching the strict schema.
         """.trimIndent()
 
-        val tokens = mutableListOf<String>()
         try {
-            provider.generateText(prompt, reflectionGrammar).collect { tokens.add(it) }
-            val jsonStr = tokens.joinToString("")
+            val jsonStr = provider.generateResponse(
+                GenerationRequest(
+                    prompt = prompt,
+                    grammar = reflectionGrammar
+                )
+            )
             val root = JSONObject(jsonStr)
             
             val isSuccess = root.getBoolean("isSuccess")

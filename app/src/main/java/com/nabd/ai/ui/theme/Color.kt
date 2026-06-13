@@ -22,12 +22,22 @@ fun colorSchemeForPreset(
     return if (isDark) {
         when (preset) {
             ColorSchemePreset.MIDNIGHT -> darkColorScheme(
-                primary = Color(0xFFBAC3FF),
-                onPrimary = Color(0xFF001061),
-                primaryContainer = Color(0xFF001D91),
-                onPrimaryContainer = Color(0xFFDEE0FF),
-                background = Color(0xFF1B1B1F),
-                surface = Color(0xFF1B1B1F)
+                primary = Color(0xFF38BDF8), // Tactical Sky Blue
+                onPrimary = Color(0xFF082F49),
+                secondary = Color(0xFF94A3B8), // Slate Secondary
+                onSecondary = Color(0xFF0F172A),
+                background = Color(0xFF13141A), // Agora Background Deep Black
+                onBackground = Color.White,
+                surface = Color(0xFF1E1F28), // Agora Surface
+                onSurface = Color.White,
+                surfaceVariant = Color(0xFF2A2B36), // Agora Input Dark
+                onSurfaceVariant = Color(0xFF9EA1B0), // Text Secondary
+                outline = Color(0xFF3B3C46), // Accent Color
+                inverseSurface = Color(0xFF0F0F12), // Deep Terminal Black
+                secondaryContainer = Color(0xFF1A1A1E), // Muted Secondary
+                tertiary = Color(0xFF00E5FF), // Tactical Cyan
+                error = Color(0xFFD32F2F), // Muted Red for errors
+                errorContainer = Color(0xFF1A1212) // Very dark red for error backgrounds
             )
             ColorSchemePreset.NORDIC -> darkColorScheme(
                 primary = Color(0xFF82CFFF),

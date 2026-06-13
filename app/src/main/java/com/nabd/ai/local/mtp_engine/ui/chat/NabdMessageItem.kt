@@ -107,7 +107,7 @@ fun AgentStatusHeader(status: MessageStatus, modelName: String?) {
         else -> "AGENT_OS : ${modelName?.uppercase() ?: "LOCAL_INFERENCE"}"
     }
     
-    val statusColor = if (status == MessageStatus.ERROR) Color.Red else MaterialTheme.colorScheme.primary
+    val statusColor = if (status == MessageStatus.ERROR) MaterialTheme.colorScheme.error else MaterialTheme.colorScheme.primary
 
     Text(
         text = "> $statusText",

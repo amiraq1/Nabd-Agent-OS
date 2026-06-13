@@ -49,7 +49,7 @@ Java_com_nabd_ai_local_engine_LlamaEngine_nativeGenerate(JNIEnv* env, jobject th
 }
 
 JNIEXPORT void JNICALL
-Java_com_nabd_ai_local_engine_LlamaEngine_nativeStopGeneration(JNIEnv* env, jobject thiz, jlong handle) {
+Java_com_nabd_ai_local_engine_LlamaEngine_nativeAbortGeneration(JNIEnv* env, jobject thiz, jlong handle) {
     auto* context = reinterpret_cast<LlamaRuntimeContext*>(handle);
     if (context) {
         context->stopGeneration();
@@ -70,12 +70,32 @@ Java_com_nabd_ai_local_engine_LlamaEngine_nativeRelease(JNIEnv* env, jobject thi
     delete context;
 }
 
-JNIEXPORT jstring JNICALL
-Java_com_nabd_ai_local_engine_NabdEngine_stringFromJNI(
-        JNIEnv* env,
-        jobject /* this */) {
-    std::string hello = "Nabd Native Engine Active";
-    return env->NewStringUTF(hello.c_str());
+extern "C" JNIEXPORT jint JNICALL
+JNI_OnLoad(JavaVM* vm, void* reserved) {
+    JNIEnv* env;
+    if (vm->GetEnv(reinterpret_cast<void**>(&env), JNI_VERSION_1_6) != JNI_OK) {
+        return JNI_ERR;
+    }
+
+    jclass clazz = env->FindClass("com/nabd/ai/local/engine/LlamaEngine");
+    if (clazz == nullptr) {
+        return JNI_ERR;
+    }
+
+    static const JNINativeMethod methods[] = {
+        {"nativeInit", "()J", (void*)Java_com_nabd_ai_local_engine_LlamaEngine_nativeInit},
+        {"nativeLoadModel", "(JLjava/lang/String;)Z", (void*)Java_com_nabd_ai_local_engine_LlamaEngine_nativeLoadModel},
+        {"nativeGenerate", "(JLjava/lang/String;Ljava/lang/String;Lcom/nabd/ai/local/engine/LlamaEngine$TokenCallback;)V", (void*)Java_com_nabd_ai_local_engine_LlamaEngine_nativeGenerate},
+        {"nativeAbortGeneration", "(J)V", (void*)Java_com_nabd_ai_local_engine_LlamaEngine_nativeAbortGeneration},
+        {"nativeUnloadModel", "(J)V", (void*)Java_com_nabd_ai_local_engine_LlamaEngine_nativeUnloadModel},
+        {"nativeRelease", "(J)V", (void*)Java_com_nabd_ai_local_engine_LlamaEngine_nativeRelease}
+    };
+
+    if (env->RegisterNatives(clazz, methods, sizeof(methods) / sizeof(methods[0])) < 0) {
+        return JNI_ERR;
+    }
+
+    return JNI_VERSION_1_6;
 }
 
 } // extern "C"

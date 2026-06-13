@@ -26,13 +26,13 @@ fun NabdSettingsPanel(
     Column(
         modifier = modifier
             .fillMaxWidth()
-            .background(Color(0xFF0A0A0C))
+            .background(androidx.compose.material3.MaterialTheme.colorScheme.inverseSurface)
             .padding(24.dp)
     ) {
         Text(
             text = "SYSTEM :: INFERENCE_CONFIG",
             style = TextStyle(
-                color = Color(0xFFE2E2E2),
+                color = androidx.compose.material3.MaterialTheme.colorScheme.onSurface,
                 fontFamily = FontFamily.Monospace,
                 fontSize = 14.sp,
                 letterSpacing = 2.sp

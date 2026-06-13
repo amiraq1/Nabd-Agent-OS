@@ -1,11 +1,14 @@
 package com.nabd.ai.local.mtp_engine.architecture
 
 import kotlinx.serialization.Serializable
+import androidx.compose.runtime.Stable
 
 @Serializable
+@Stable
 data class AttachmentMeta(val items: List<AttachmentItem> = emptyList())
 
 @Serializable
+@Stable
 data class AttachmentItem(
     val originalUri: String? = null,
     val type: String,               // "image", "video", "file", "pdf"
@@ -23,6 +26,7 @@ data class AttachmentItem(
  * Migrated from legacy Agora structure for Nabd's tactical architecture.
  */
 @Serializable
+@Stable
 data class SelectedAttachment(
     val uri: String,
     val type: String,               // "image", "video", "file", "pdf"

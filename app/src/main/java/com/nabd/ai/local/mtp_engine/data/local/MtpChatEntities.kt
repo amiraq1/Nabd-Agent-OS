@@ -3,11 +3,11 @@ package com.nabd.ai.local.mtp_engine.data.local
 import androidx.room.*
 
 /**
- * ConversationEntity: Represents a conversation session.
+ * ChatEntity: Represents a conversation session.
  * Stores the routing map for non-linear history exploration.
  */
 @Entity(tableName = "conversations")
-data class ConversationEntity(
+data class ChatEntity(
     @PrimaryKey val id: String,
     val title: String,
     val selectedBranchesJson: String, // Flat JSON mapping of parentId -> selectedChildId
@@ -22,17 +22,17 @@ data class ConversationEntity(
     tableName = "messages",
     foreignKeys = [
         ForeignKey(
-            entity = ConversationEntity::class,
+            entity = ChatEntity::class,
             parentColumns = ["id"],
-            childColumns = ["conversationId"],
+            childColumns = ["chatId"],
             onDelete = ForeignKey.CASCADE // Root-and-branch cleanup
         )
     ],
-    indices = [Index("conversationId"), Index("parentId")]
+    indices = [Index("chatId"), Index("parentId")]
 )
 data class MessageEntity(
     @PrimaryKey val id: String,
-    val conversationId: String,
+    val chatId: String,
     val parentId: String?, // Points to parent message forming the tree structure
     val text: String,
     val participant: String, // String representation of Participant Enum
@@ -74,23 +74,25 @@ data class MessageEmbeddingEntity(
 @Dao
 interface MtpChatDao {
     @Query("SELECT * FROM conversations ORDER BY lastUpdated DESC")
-    suspend fun getAllConversations(): List<ConversationEntity>
+    suspend fun getAllConversations(): List<ChatEntity>
 
     @Insert(onConflict = OnConflictStrategy.REPLACE)
-    suspend fun upsertConversation(conversation: ConversationEntity)
+    suspend fun upsertConversation(conversation: ChatEntity)
 
     @Query("UPDATE conversations SET selectedBranchesJson = :branches WHERE id = :chatId")
     suspend fun updateRoutingMap(chatId: String, branches: String)
 
-    @Query("SELECT * FROM messages WHERE conversationId = :chatId ORDER BY timestamp ASC")
+    @Query("SELECT * FROM messages WHERE chatId = :chatId ORDER BY timestamp ASC")
     suspend fun getConversationMessages(chatId: String): List<MessageEntity>
 
     @Query("SELECT * FROM messages WHERE id IN (:ids)")
     suspend fun getMessagesByIds(ids: List<String>): List<MessageEntity>
 
+    @Transaction
     @Insert(onConflict = OnConflictStrategy.REPLACE)
     suspend fun upsertMessage(message: MessageEntity)
 
+    @Transaction
     @Insert(onConflict = OnConflictStrategy.REPLACE)
     suspend fun upsertEmbedding(embedding: MessageEmbeddingEntity)
 

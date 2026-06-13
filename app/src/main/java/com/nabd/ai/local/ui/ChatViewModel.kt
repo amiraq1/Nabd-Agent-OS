@@ -124,6 +124,7 @@ class ChatViewModel(
             is NabdAction.SwitchBranch -> switchBranch(action.parentId, action.childId)
             is NabdAction.RetryGeneration -> retryGeneration(action.messageId)
             NabdAction.CancelGeneration -> cancelGeneration()
+            NabdAction.ResetConversation -> resetConversation()
             is NabdAction.UpdateInferenceConfig -> _inferenceConfig.value = action.config
             is NabdAction.ToggleWebSearch -> _inferenceConfig.value = _inferenceConfig.value.copy(webSearchEnabled = action.enabled)
             is NabdAction.ToggleShell -> _inferenceConfig.value = _inferenceConfig.value.copy(shellEnabled = action.enabled)
@@ -270,6 +271,15 @@ class ChatViewModel(
         viewModelScope.launch {
             generationManager.halt()
             generationJob?.cancel()
+        }
+    }
+
+    private fun resetConversation() {
+        cancelGeneration()
+        currentConversationId = UUID.randomUUID().toString()
+        conversationManager.clear()
+        viewModelScope.launch {
+            conversationRepository.createConversation(currentConversationId)
         }
     }
 }

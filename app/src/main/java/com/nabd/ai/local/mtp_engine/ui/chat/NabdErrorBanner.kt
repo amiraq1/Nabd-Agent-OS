@@ -27,14 +27,14 @@ fun NabdErrorBanner(
     Row(
         modifier = modifier
             .fillMaxWidth()
-            .background(Color(0xFF1A1212)) // أحمر داكن جداً يكسر اللون الأحادي بهدوء
+            .background(androidx.compose.material3.MaterialTheme.colorScheme.errorContainer) // أحمر داكن جداً يكسر اللون الأحادي بهدوء
             .padding(vertical = 16.dp, horizontal = 24.dp),
         verticalAlignment = Alignment.CenterVertically
     ) {
         Text(
             text = "SYSTEM_FAULT :: ${extractErrorMessage(error).uppercase()}",
             style = TextStyle(
-                color = Color(0xFFD32F2F), // أحمر مطفأ (Muted Red)
+                color = androidx.compose.material3.MaterialTheme.colorScheme.error, // أحمر مطفأ (Muted Red)
                 fontFamily = FontFamily.Monospace,
                 fontSize = 12.sp,
                 letterSpacing = 1.5.sp

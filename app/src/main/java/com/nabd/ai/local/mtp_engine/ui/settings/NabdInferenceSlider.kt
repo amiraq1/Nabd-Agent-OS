@@ -39,7 +39,7 @@ fun NabdInferenceSlider(
             Text(
                 text = label.uppercase(),
                 style = TextStyle(
-                    color = Color(0xFF8A8A93), // لون باهت للتسلسل الهرمي
+                    color = androidx.compose.material3.MaterialTheme.colorScheme.onSurfaceVariant, // لون باهت للتسلسل الهرمي
                     fontFamily = FontFamily.Monospace,
                     fontSize = 12.sp,
                     letterSpacing = 1.sp
@@ -48,7 +48,7 @@ fun NabdInferenceSlider(
             Text(
                 text = String.format("%.2f", value),
                 style = TextStyle(
-                    color = Color(0xFFD4D4D8), // لون ساطع للبيانات النشطة
+                    color = androidx.compose.material3.MaterialTheme.colorScheme.onSurface, // لون ساطع للبيانات النشطة
                     fontFamily = FontFamily.Monospace,
                     fontSize = 12.sp
                 )
@@ -63,9 +63,9 @@ fun NabdInferenceSlider(
             onValueChange = onValueChange,
             valueRange = valueRange,
             colors = SliderDefaults.colors(
-                thumbColor = Color(0xFFE2E2E2),
-                activeTrackColor = Color(0xFF5E5E66),
-                inactiveTrackColor = Color(0xFF1A1A1E)
+                thumbColor = androidx.compose.material3.MaterialTheme.colorScheme.onSurface,
+                activeTrackColor = androidx.compose.material3.MaterialTheme.colorScheme.outline,
+                inactiveTrackColor = androidx.compose.material3.MaterialTheme.colorScheme.secondaryContainer
             )
         )
     }

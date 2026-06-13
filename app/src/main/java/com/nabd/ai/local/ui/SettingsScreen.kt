@@ -3,6 +3,7 @@ package com.nabd.ai.local.ui
 import android.net.Uri
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
+import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
@@ -10,12 +11,14 @@ import androidx.compose.foundation.lazy.items
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.*
 import androidx.compose.material3.*
+import androidx.compose.material3.TabRowDefaults.tabIndicatorOffset
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
 import com.nabd.ai.local.domain.model.LocalModel
 import com.nabd.ai.local.domain.model.ModelImportState
 import com.nabd.ai.local.rag.db.KnowledgeDocumentEntity
@@ -51,13 +54,50 @@ fun SettingsScreen(
 
     var selectedTab by remember { mutableIntStateOf(0) }
 
-    Column(modifier = Modifier.fillMaxSize()) {
-        TopAppBar(title = { Text("Settings & Knowledge") })
+    Column(modifier = Modifier.fillMaxSize().background(MaterialTheme.colorScheme.background)) {
+        TopAppBar(
+            title = { 
+                Text(
+                    "Settings & Knowledge", 
+                    style = MaterialTheme.typography.titleLarge.copy(
+                        color = MaterialTheme.colorScheme.onBackground,
+                        fontWeight = FontWeight.ExtraBold,
+                        letterSpacing = (-0.5).sp
+                    )
+                ) 
+            },
+            colors = TopAppBarDefaults.topAppBarColors(
+                containerColor = MaterialTheme.colorScheme.background,
+                titleContentColor = MaterialTheme.colorScheme.onBackground
+            )
+        )
 
-        TabRow(selectedTabIndex = selectedTab) {
-            Tab(selected = selectedTab == 0, onClick = { selectedTab = 0 }, text = { Text("Providers") })
-            Tab(selected = selectedTab == 1, onClick = { selectedTab = 1 }, text = { Text("Models") })
-            Tab(selected = selectedTab == 2, onClick = { selectedTab = 2 }, text = { Text("Knowledge") })
+        TabRow(
+            selectedTabIndex = selectedTab,
+            containerColor = MaterialTheme.colorScheme.background,
+            contentColor = MaterialTheme.colorScheme.primary,
+            indicator = { tabPositions ->
+                TabRowDefaults.Indicator(
+                    modifier = Modifier.tabIndicatorOffset(tabPositions[selectedTab]),
+                    color = MaterialTheme.colorScheme.primary
+                )
+            },
+            divider = { Divider(color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.1f)) }
+        ) {
+            val tabs = listOf("Providers", "Models", "Knowledge")
+            tabs.forEachIndexed { index, title ->
+                Tab(
+                    selected = selectedTab == index,
+                    onClick = { selectedTab = index },
+                    text = { 
+                        Text(
+                            title, 
+                            color = if (selectedTab == index) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurfaceVariant,
+                            fontWeight = if (selectedTab == index) FontWeight.Bold else FontWeight.Normal
+                        ) 
+                    }
+                )
+            }
         }
 
         when (selectedTab) {
@@ -82,7 +122,13 @@ fun ProvidersTab(
         modifier = Modifier.fillMaxSize()
     ) {
         item {
-            Text("Select LLM Provider", style = MaterialTheme.typography.titleMedium)
+            Text(
+                "Select LLM Provider", 
+                style = MaterialTheme.typography.titleMedium.copy(
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    fontWeight = FontWeight.Bold
+                )
+            )
         }
         item {
             com.nabd.ai.local.engine.ProviderType.values().forEach { provider ->
@@ -92,17 +138,27 @@ fun ProvidersTab(
                 ) {
                     RadioButton(
                         selected = uiState.activeProvider == provider.name,
-                        onClick = { onProviderSelect(provider) }
+                        onClick = { onProviderSelect(provider) },
+                        colors = RadioButtonDefaults.colors(
+                            selectedColor = MaterialTheme.colorScheme.primary,
+                            unselectedColor = MaterialTheme.colorScheme.onSurfaceVariant
+                        )
                     )
                     Spacer(Modifier.width(8.dp))
-                    Text(provider.name)
+                    Text(provider.name, color = MaterialTheme.colorScheme.onBackground)
                 }
             }
         }
         item {
-            Divider()
+            Divider(color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.2f))
             Spacer(Modifier.height(16.dp))
-            Text("API Keys", style = MaterialTheme.typography.titleMedium)
+            Text(
+                "API Keys", 
+                style = MaterialTheme.typography.titleMedium.copy(
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    fontWeight = FontWeight.Bold
+                )
+            )
         }
         item {
             var localOpenAiKey by remember { mutableStateOf(uiState.openAiApiKey ?: "") }
@@ -151,10 +207,20 @@ fun ModelsTab(
             horizontalArrangement = Arrangement.SpaceBetween,
             verticalAlignment = Alignment.CenterVertically
         ) {
-            Text(text = "Available Models", style = MaterialTheme.typography.titleMedium)
-            Button(onClick = { launcher.launch(arrayOf("*/*")) }) {
-                Icon(Icons.Default.Add, contentDescription = null)
-                Text("Import")
+            Text(
+                text = "Available Models", 
+                style = MaterialTheme.typography.titleMedium.copy(
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    fontWeight = FontWeight.Bold
+                )
+            )
+            Button(
+                onClick = { launcher.launch(arrayOf("*/*")) },
+                colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.primary)
+            ) {
+                Icon(Icons.Default.Add, contentDescription = null, tint = MaterialTheme.colorScheme.onPrimary)
+                Spacer(Modifier.width(4.dp))
+                Text("Import", color = MaterialTheme.colorScheme.onPrimary, fontWeight = FontWeight.Bold)
             }
         }
 
@@ -187,10 +253,20 @@ fun KnowledgeTab(
             horizontalArrangement = Arrangement.SpaceBetween,
             verticalAlignment = Alignment.CenterVertically
         ) {
-            Text(text = "Knowledge Base", style = MaterialTheme.typography.titleMedium)
-            Button(onClick = { launcher.launch(arrayOf("*/*")) }) {
-                Icon(Icons.Default.AddCircle, contentDescription = null)
-                Text("Add Doc")
+            Text(
+                text = "Knowledge Base", 
+                style = MaterialTheme.typography.titleMedium.copy(
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    fontWeight = FontWeight.Bold
+                )
+            )
+            Button(
+                onClick = { launcher.launch(arrayOf("*/*")) },
+                colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.primary)
+            ) {
+                Icon(Icons.Default.AddCircle, contentDescription = null, tint = MaterialTheme.colorScheme.onPrimary)
+                Spacer(Modifier.width(4.dp))
+                Text("Add Doc", color = MaterialTheme.colorScheme.onPrimary, fontWeight = FontWeight.Bold)
             }
         }
 
@@ -268,7 +344,7 @@ fun ModelItem(model: LocalModel, isActive: Boolean, onSelect: () -> Unit, onDele
                 Text(text = "%.2f GB".format(sizeInGb), style = MaterialTheme.typography.bodySmall)
             }
             if (isActive) Icon(Icons.Default.Check, contentDescription = null, tint = MaterialTheme.colorScheme.primary)
-            IconButton(onClick = onDelete) { Icon(Icons.Default.Delete, contentDescription = null, tint = Color.Red) }
+            IconButton(onClick = onDelete) { Icon(Icons.Default.Delete, contentDescription = null, tint = MaterialTheme.colorScheme.error) }
         }
     }
 }

@@ -27,13 +27,13 @@ fun NabdNuclearPromptEditor(
     Column(
         modifier = modifier
             .fillMaxWidth()
-            .background(Color(0xFF0A0A0C))
+            .background(androidx.compose.material3.MaterialTheme.colorScheme.inverseSurface)
             .padding(24.dp)
     ) {
         Text(
             text = "SYSTEM :: NUCLEAR_DIRECTIVE",
             style = TextStyle(
-                color = Color(0xFFD32F2F), // أحمر مطفأ دلالة على حساسية التكوين
+                color = androidx.compose.material3.MaterialTheme.colorScheme.error, // أحمر مطفأ دلالة على حساسية التكوين
                 fontFamily = FontFamily.Monospace,
                 fontSize = 12.sp,
                 letterSpacing = 2.sp
@@ -46,15 +46,15 @@ fun NabdNuclearPromptEditor(
             onValueChange = onPromptChange,
             modifier = Modifier
                 .fillMaxWidth()
-                .background(Color(0xFF121214))
+                .background(androidx.compose.material3.MaterialTheme.colorScheme.surface)
                 .padding(16.dp),
             textStyle = TextStyle(
-                color = Color(0xFFE2E2E2),
+                color = androidx.compose.material3.MaterialTheme.colorScheme.onSurface,
                 fontFamily = FontFamily.Monospace,
                 fontSize = 13.sp,
                 lineHeight = 22.sp
             ),
-            cursorBrush = SolidColor(Color(0xFFD32F2F))
+            cursorBrush = SolidColor(androidx.compose.material3.MaterialTheme.colorScheme.error)
         )
     }
 }

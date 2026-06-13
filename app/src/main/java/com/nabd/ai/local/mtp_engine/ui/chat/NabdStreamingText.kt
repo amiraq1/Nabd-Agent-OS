@@ -105,7 +105,7 @@ fun NabdStreamingText(
     content: String,
     isStreaming: Boolean,
     modifier: Modifier = Modifier,
-    color: Color = Color(0xFFD4D4D8),
+    color: Color = androidx.compose.material3.MaterialTheme.colorScheme.onSurfaceVariant,
     fontSize: TextUnit = 16.sp,
     fontWeight: FontWeight = FontWeight.Normal
 ) {

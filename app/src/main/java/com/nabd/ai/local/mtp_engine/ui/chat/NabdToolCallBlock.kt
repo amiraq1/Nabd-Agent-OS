@@ -28,7 +28,7 @@ fun NabdToolCallBlock(
     Column(
         modifier = modifier
             .fillMaxWidth()
-            .background(Color(0xFF0F0F12))
+            .background(androidx.compose.material3.MaterialTheme.colorScheme.inverseSurface)
             .border(1.dp, androidx.compose.material3.MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.2f))
             .padding(16.dp)
     ) {
@@ -36,7 +36,7 @@ fun NabdToolCallBlock(
             Text(
                 text = "EXEC :: $toolName".uppercase(),
                 style = androidx.compose.material3.MaterialTheme.typography.labelMedium.copy(
-                    color = Color(0xFF6B6B76),
+                    color = androidx.compose.material3.MaterialTheme.colorScheme.onSurfaceVariant,
                     fontFamily = FontFamily.Monospace,
                     letterSpacing = 1.sp
                 )
@@ -48,7 +48,7 @@ fun NabdToolCallBlock(
         Text(
             text = arguments,
             style = androidx.compose.material3.MaterialTheme.typography.bodyMedium.copy(
-                color = Color(0xFF6B6B76),
+                color = androidx.compose.material3.MaterialTheme.colorScheme.onSurfaceVariant,
                 fontFamily = FontFamily.Monospace
             )
         )
@@ -56,8 +56,8 @@ fun NabdToolCallBlock(
         if (result != null) {
             Spacer(modifier = Modifier.height(12.dp))
             val (resultColor, resultText) = when (result) {
-                is ToolResult.Success -> Color(0xFF00E5FF) to "SUCCESS :: ${result.output.take(80)}..."
-                is ToolResult.Failure -> androidx.compose.material3.MaterialTheme.colorScheme.primary to "FAULT :: ${result.reason}"
+                is ToolResult.Success -> androidx.compose.material3.MaterialTheme.colorScheme.tertiary to "SUCCESS :: ${result.output.take(80)}..."
+                is ToolResult.Failure -> androidx.compose.material3.MaterialTheme.colorScheme.error to "FAULT :: ${result.reason}"
             }
             Text(
                 text = resultText,

@@ -12,6 +12,7 @@ sealed interface NabdAction {
     data class SwitchBranch(val parentId: String, val childId: String) : NabdAction
     data class RetryGeneration(val messageId: String) : NabdAction
     data object CancelGeneration : NabdAction
+    data object ResetConversation : NabdAction
     data class UpdateInferenceConfig(val config: InferenceConfig) : NabdAction
     data class ToggleWebSearch(val enabled: Boolean) : NabdAction
     data class ToggleShell(val enabled: Boolean) : NabdAction

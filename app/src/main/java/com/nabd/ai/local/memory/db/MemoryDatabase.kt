@@ -8,7 +8,7 @@ import androidx.room.TypeConverters
 import com.nabd.ai.local.memory.MemoryEntity
 import com.nabd.ai.local.embedding.db.MemoryEmbeddingDao
 import com.nabd.ai.local.embedding.db.MemoryEmbeddingEntity
-import com.nabd.ai.local.mtp_engine.data.local.ConversationEntity
+import com.nabd.ai.local.mtp_engine.data.local.ChatEntity
 import com.nabd.ai.local.mtp_engine.data.local.MessageEntity
 import com.nabd.ai.local.mtp_engine.data.local.MtpChatDao
 import com.nabd.ai.local.rag.db.*
@@ -20,7 +20,7 @@ import com.nabd.ai.local.rag.db.*
         KnowledgeDocumentEntity::class,
         KnowledgeChunkEntity::class,
         KnowledgeEmbeddingEntity::class,
-        ConversationEntity::class,
+        ChatEntity::class,
         MessageEntity::class,
         com.nabd.ai.local.mtp_engine.data.local.MessageEmbeddingEntity::class
     ], 

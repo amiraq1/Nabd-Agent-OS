@@ -24,14 +24,14 @@ fun NabdCodeBlock(
     Column(
         modifier = modifier
             .fillMaxWidth()
-            .background(Color(0xFF0F0F12)) // Tactical Code Background
+            .background(androidx.compose.material3.MaterialTheme.colorScheme.inverseSurface) // Tactical Code Background
             .padding(start = 24.dp, top = 24.dp, bottom = 24.dp, end = 16.dp)
     ) {
         if (!language.isNullOrBlank()) {
             Text(
                 text = language.uppercase(),
                 style = androidx.compose.material3.MaterialTheme.typography.labelMedium.copy(
-                    color = Color(0xFF6B6B76), // SteelGray
+                    color = androidx.compose.material3.MaterialTheme.colorScheme.onSurfaceVariant, // SteelGray
                     fontFamily = FontFamily.Monospace,
                     letterSpacing = 1.5.sp
                 ),
@@ -42,7 +42,7 @@ fun NabdCodeBlock(
         Text(
             text = code,
             style = androidx.compose.material3.MaterialTheme.typography.bodyMedium.copy(
-                color = Color(0xFF00E5FF), // Cyan code for tactical terminal feel
+                color = androidx.compose.material3.MaterialTheme.colorScheme.tertiary, // Tactical Cyan
                 fontFamily = FontFamily.Monospace,
                 lineHeight = 24.sp
             )

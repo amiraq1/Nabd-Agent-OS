@@ -48,7 +48,15 @@ class AgentForegroundService : Service() {
     override fun onStartCommand(intent: Intent?, flags: Int, startId: Int): Int {
         val goal = intent?.getStringExtra("GOAL") ?: "Running background task"
         
-        startForeground(NOTIFICATION_ID, createNotification(goal))
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.UPSIDE_DOWN_CAKE) {
+            startForeground(
+                NOTIFICATION_ID, 
+                createNotification(goal),
+                android.content.pm.ServiceInfo.FOREGROUND_SERVICE_TYPE_SPECIAL_USE
+            )
+        } else {
+            startForeground(NOTIFICATION_ID, createNotification(goal))
+        }
 
         // In a real app, this would be injected via AppContainer
         // agentRunner = (application as NabdApplication).container.autonomousAgentRunner

@@ -23,10 +23,13 @@ android {
             useSupportLibrary = true
         }
 
+        ndk {
+            abiFilters += setOf("arm64-v8a")
+        }
+
         externalNativeBuild {
             cmake {
                 cppFlags += "-std=c++17"
-                abiFilters += "arm64-v8a"
             }
         }
     }
@@ -61,14 +64,12 @@ android {
         }
     }
 
-    /*
     externalNativeBuild {
         cmake {
             path = file("src/main/cpp/CMakeLists.txt")
             version = "3.22.1"
         }
     }
-    */
 }
 
 dependencies {

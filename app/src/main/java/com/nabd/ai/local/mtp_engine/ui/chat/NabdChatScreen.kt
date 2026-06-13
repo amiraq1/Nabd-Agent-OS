@@ -26,14 +26,7 @@ import com.nabd.ai.local.mtp_engine.architecture.ChatMessage
 import com.nabd.ai.local.mtp_engine.architecture.Participant
 import com.nabd.ai.local.mtp_engine.architecture.NabdAction
 import com.nabd.ai.local.mtp_engine.ui.components.RecomposeSafeMarkdown
-
-// لوحة الألوان المخصصة من مستودع Agora لتطبيق نبض
-val AgoraBackground = Color(0xFF13141A)
-val AgoraSurface = Color(0xFF1E1F28)
-val AgoraInputDark = Color(0xFF2A2B36)
-val TextPrimary = Color.White
-val TextSecondary = Color(0xFF9EA1B0)
-val AccentColor = Color(0xFF3B3C46)
+import com.nabd.ai.local.mtp_engine.ui.components.IntelligenceFlowIndicator
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -42,35 +35,51 @@ fun NabdChatScreen(
     modifier: Modifier = Modifier
 ) {
     val uiState by viewModel.state.collectAsState()
-    var inputText by remember { mutableStateOf("") }
     val listState = rememberLazyListState()
     val coroutineScope = rememberCoroutineScope()
 
     // تفعيل التمرير التلقائي التكتيكي عند وصول رسائل جديدة (Auto-Scroll)
+    // Optimization: Use derivedStateOf or remember keys to avoid unnecessary triggers
     LaunchedEffect(uiState.messages.size, uiState.isGenerating) {
         if (uiState.messages.isNotEmpty()) {
             coroutineScope.launch {
-                listState.animateScrollToItem(uiState.messages.size - 1)
+                // Focus on the end of the stream, including the flow indicator if generating
+                listState.animateScrollToItem(uiState.messages.size - (if (uiState.isGenerating) 0 else 1))
             }
         }
     }
 
     Scaffold(
         modifier = modifier.fillMaxSize(),
-        containerColor = AgoraBackground,
-        topBar = { NabdTopAppBar(currentModel = uiState.selectedModel) },
+        containerColor = MaterialTheme.colorScheme.background,
+        topBar = { 
+            NabdTopAppBar(
+                currentModel = uiState.selectedModel,
+                onNewChat = { viewModel.dispatch(NabdAction.ResetConversation) },
+                onMemoryClick = { /* Future: Semantic Memory View */ }
+            ) 
+        },
         bottomBar = {
-            NabdBottomInputArea(
-                text = inputText,
-                onTextChange = { inputText = it },
-                onSendClick = {
-                    if (inputText.isNotBlank()) {
-                        viewModel.dispatch(NabdAction.ProcessPrompt(inputText))
-                        inputText = ""
-                    }
+            // Integration of the refactored Avant-Garde input area
+            NabdInputArea(
+                onSendMessage = { text, attachments ->
+                    if (text.isNotBlank() || attachments.isNotEmpty()) {
+                        viewModel.dispatch(NabdAction.ProcessPrompt(text, attachments))
+                        true
+                    } else false
                 },
-                selectedModelName = uiState.selectedModel,
-                onModelSelectClick = { /* فتح نافذة اختيار الموديل المحلي أو السحابي */ }
+                onStopGeneration = { viewModel.dispatch(NabdAction.CancelGeneration) },
+                isLoading = uiState.isGenerating,
+                enabledModels = emptySet(),
+                selectedModel = uiState.selectedModel,
+                webSearchEnabled = uiState.inferenceConfig.webSearchEnabled,
+                shellEnabled = uiState.inferenceConfig.shellEnabled,
+                memoryEnabled = uiState.inferenceConfig.memoryEnabled,
+                onWebSearchToggle = { viewModel.dispatch(NabdAction.ToggleWebSearch(it)) },
+                onShellToggle = { viewModel.dispatch(NabdAction.ToggleShell(it)) },
+                onMemoryToggle = { viewModel.dispatch(NabdAction.ToggleMemory(it)) },
+                onModelSelect = { /* Navigation to model picker */ },
+                modifier = Modifier.padding(16.dp) // Maintain the "floating" padding
             )
         }
     ) { paddingValues ->
@@ -88,7 +97,7 @@ fun NabdChatScreen(
                 ) {
                     Text(
                         text = "Welcome to Nabd",
-                        color = TextPrimary,
+                        color = MaterialTheme.colorScheme.onBackground,
                         fontSize = 32.sp,
                         fontWeight = FontWeight.ExtraBold,
                         letterSpacing = (-0.5).sp
@@ -96,7 +105,7 @@ fun NabdChatScreen(
                     Spacer(modifier = Modifier.height(8.dp))
                     Text(
                         text = "Your Local Autonomous AI Agent OS",
-                        color = TextSecondary,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
                         fontSize = 14.sp,
                         fontWeight = FontWeight.Medium
                     )
@@ -111,8 +120,23 @@ fun NabdChatScreen(
                     contentPadding = PaddingValues(top = 8.dp, bottom = 16.dp),
                     verticalArrangement = Arrangement.spacedBy(12.dp)
                 ) {
-                    items(uiState.messages, key = { it.id }) { message ->
-                        NabdMessageBubble(message = message)
+                    items(
+                        items = uiState.messages,
+                        key = { it.id }
+                    ) { message ->
+                        val isLastMessage = uiState.messages.lastOrNull()?.id == message.id
+                        val isStreaming = isLastMessage && uiState.isGenerating && message.participant != Participant.USER
+                        
+                        NabdMessageBubble(
+                            message = message,
+                            isGenerating = isStreaming
+                        )
+                    }
+
+                    if (uiState.isGenerating) {
+                        item {
+                            IntelligenceFlowIndicator()
+                        }
                     }
                 }
             }
@@ -121,7 +145,11 @@ fun NabdChatScreen(
 }
 
 @Composable
-fun NabdTopAppBar(currentModel: String?) {
+fun NabdTopAppBar(
+    currentModel: String?,
+    onNewChat: () -> Unit,
+    onMemoryClick: () -> Unit
+) {
     Row(
         modifier = Modifier
             .fillMaxWidth()
@@ -133,131 +161,42 @@ fun NabdTopAppBar(currentModel: String?) {
         // الأزرار اليسارية مدمجة داخل كبسولة ملساء كبنية Agora
         Row(
             modifier = Modifier
-                .background(AgoraSurface, RoundedCornerShape(50.dp))
+                .background(MaterialTheme.colorScheme.surface, RoundedCornerShape(50.dp))
                 .padding(horizontal = 6.dp, vertical = 4.dp),
             verticalAlignment = Alignment.CenterVertically
         ) {
-            IconButton(onClick = { /* جلسة جديدة */ }) {
-                Icon(Icons.Default.Add, contentDescription = "New Chat", tint = TextPrimary)
+            IconButton(onClick = onNewChat) {
+                Icon(Icons.Default.Add, contentDescription = "New Chat", tint = MaterialTheme.colorScheme.onSurface)
             }
-            IconButton(onClick = { /* أدوات التكتيك والذاكرة */ }) {
-                Icon(Icons.Default.Memory, contentDescription = "Memory Status", tint = TextPrimary)
+            IconButton(onClick = onMemoryClick) {
+                Icon(Icons.Default.Memory, contentDescription = "Memory Status", tint = MaterialTheme.colorScheme.onSurface)
             }
         }
 
         // كبسولة العنوان وشعار نبض جهة اليمين
         Row(
             modifier = Modifier
-                .background(AgoraSurface, RoundedCornerShape(50.dp))
+                .background(MaterialTheme.colorScheme.surface, RoundedCornerShape(50.dp))
                 .padding(horizontal = 16.dp, vertical = 8.dp),
             verticalAlignment = Alignment.CenterVertically
         ) {
             Text(
                 text = "نبض",
-                color = TextPrimary,
+                color = MaterialTheme.colorScheme.onSurface,
                 fontWeight = FontWeight.Bold,
                 fontSize = 16.sp,
                 modifier = Modifier.padding(end = 8.dp)
             )
-            Icon(Icons.Default.Menu, contentDescription = "Menu", tint = TextPrimary)
+            Icon(Icons.Default.Menu, contentDescription = "Menu", tint = MaterialTheme.colorScheme.onSurface)
         }
     }
 }
 
-@OptIn(ExperimentalMaterial3Api::class)
 @Composable
-fun NabdBottomInputArea(
-    text: String,
-    onTextChange: (String) -> Unit,
-    onSendClick: () -> Unit,
-    selectedModelName: String,
-    onModelSelectClick: () -> Unit
+fun NabdMessageBubble(
+    message: ChatMessage,
+    isGenerating: Boolean = false
 ) {
-    Box(
-        modifier = Modifier
-            .fillMaxWidth()
-            .navigationBarsPadding()
-            .padding(16.dp)
-            .background(AgoraSurface, RoundedCornerShape(28.dp))
-            .padding(12.dp)
-    ) {
-        Row(
-            modifier = Modifier.fillMaxWidth(),
-            verticalAlignment = Alignment.Bottom
-        ) {
-            // التحكم الجانبي: التوسيع وزر الإرسال الدائري السفلي
-            Column(
-                horizontalAlignment = Alignment.CenterHorizontally,
-                verticalArrangement = Arrangement.SpaceBetween,
-                modifier = Modifier.height(110.dp)
-            ) {
-                Icon(
-                    imageVector = Icons.Default.UnfoldMore,
-                    contentDescription = "Expand Panel",
-                    tint = TextSecondary,
-                    modifier = Modifier.padding(top = 4.dp)
-                )
-                Spacer(modifier = Modifier.weight(1f))
-                IconButton(
-                    onClick = onSendClick,
-                    modifier = Modifier
-                        .background(if (text.isNotBlank()) TextPrimary else AccentColor, CircleShape)
-                        .size(44.dp)
-                ) {
-                    Icon(
-                        imageVector = Icons.Default.ArrowUpward,
-                        contentDescription = "Execute Command",
-                        tint = if (text.isNotBlank()) AgoraBackground else TextSecondary
-                    )
-                }
-            }
-
-            Spacer(modifier = Modifier.width(12.dp))
-
-            // حقل الإدخال النصي ومحدد الموديل
-            Column(
-                modifier = Modifier.weight(1f)
-            ) {
-                TextField(
-                    value = text,
-                    onValueChange = onTextChange,
-                    placeholder = { Text("...Ask Nabd anything", color = TextSecondary, fontSize = 15.sp) },
-                    colors = TextFieldDefaults.colors(
-                        focusedContainerColor = Color.Transparent,
-                        unfocusedContainerColor = Color.Transparent,
-                        disabledContainerColor = Color.Transparent,
-                        focusedIndicatorColor = Color.Transparent,
-                        unfocusedIndicatorColor = Color.Transparent,
-                        cursorColor = TextPrimary
-                    ),
-                    modifier = Modifier.fillMaxWidth(),
-                    maxLines = 4
-                )
-
-                Spacer(modifier = Modifier.height(12.dp))
-
-                // زر كبسولة النماذج (Model Picker) المستوحى بدقة من الصورة
-                Row(
-                    modifier = Modifier
-                        .background(AgoraInputDark, RoundedCornerShape(50.dp))
-                        .padding(horizontal = 12.dp, vertical = 6.dp)
-                        .align(Alignment.End)
-                        .clickable { onModelSelectClick() },
-                    verticalAlignment = Alignment.CenterVertically
-                ) {
-                    Icon(Icons.Default.MoreVert, contentDescription = "Model Options", tint = TextSecondary, modifier = Modifier.size(14.dp))
-                    Spacer(modifier = Modifier.width(6.dp))
-                    Text(text = selectedModelName, color = TextSecondary, fontSize = 12.sp, fontWeight = FontWeight.Medium)
-                    Spacer(modifier = Modifier.width(6.dp))
-                    Icon(Icons.Default.Add, contentDescription = "Change Model", tint = TextSecondary, modifier = Modifier.size(14.dp))
-                }
-            }
-        }
-    }
-}
-
-@Composable
-fun NabdMessageBubble(message: ChatMessage) {
     val isUser = message.participant == Participant.USER
     Row(
         modifier = Modifier.fillMaxWidth(),
@@ -266,7 +205,7 @@ fun NabdMessageBubble(message: ChatMessage) {
         Box(
             modifier = Modifier
                 .background(
-                    color = if (isUser) AccentColor else AgoraSurface,
+                    color = if (isUser) MaterialTheme.colorScheme.outline else MaterialTheme.colorScheme.surface,
                     shape = RoundedCornerShape(
                         topStart = 16.dp,
                         topEnd = 16.dp,
@@ -279,15 +218,17 @@ fun NabdMessageBubble(message: ChatMessage) {
             if (isUser) {
                 Text(
                     text = message.text,
-                    color = TextPrimary,
+                    color = MaterialTheme.colorScheme.onSurface,
                     fontSize = 15.sp
                 )
             } else {
                 RecomposeSafeMarkdown(
                     content = message.text,
-                    modifier = Modifier.fillMaxWidth()
+                    modifier = Modifier.fillMaxWidth(),
+                    isGenerating = isGenerating
                 )
             }
         }
     }
 }
+

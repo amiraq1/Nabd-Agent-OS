@@ -24,7 +24,7 @@ class ConversationRepository(
      */
     suspend fun createConversation(id: String, title: String = "New Chat") {
         chatDao.upsertConversation(
-            com.nabd.ai.local.mtp_engine.data.local.ConversationEntity(
+            com.nabd.ai.local.mtp_engine.data.local.ChatEntity(
                 id = id,
                 title = title,
                 selectedBranchesJson = "{}",
@@ -36,8 +36,8 @@ class ConversationRepository(
     /**
      * تحميل رسائل المحادثة وتحويلها فوراً إلى نماذج واجهة المستخدم (Domain Models)
      */
-    suspend fun loadMessages(conversationId: String): List<ChatMessage> {
-        return chatDao.getConversationMessages(conversationId).map { it.toDomainModel() }
+    suspend fun loadMessages(chatId: String): List<ChatMessage> {
+        return chatDao.getConversationMessages(chatId).map { it.toDomainModel() }
     }
 
     suspend fun getMessagesByIds(ids: List<String>): List<ChatMessage> {
@@ -51,8 +51,8 @@ class ConversationRepository(
     /**
      * حفظ رسالة فردية بـ O(1)
      */
-    suspend fun saveMessage(message: ChatMessage, conversationId: String) {
-        chatDao.upsertMessage(message.toEntity(conversationId))
+    suspend fun saveMessage(message: ChatMessage, chatId: String) {
+        chatDao.upsertMessage(message.toEntity(chatId))
     }
 
     suspend fun saveEmbedding(messageId: String, vector: FloatArray) {
@@ -73,9 +73,9 @@ class ConversationRepository(
     /**
      * مزامنة خريطة التوجيه عند كل تفرع جديد
      */
-    suspend fun syncRoutingMap(conversationId: String, branches: Map<String, String>) {
+    suspend fun syncRoutingMap(chatId: String, branches: Map<String, String>) {
         val branchesJson = serializeToJson(branches) 
-        chatDao.updateRoutingMap(conversationId, branchesJson)
+        chatDao.updateRoutingMap(chatId, branchesJson)
     }
 
     /**
@@ -104,11 +104,11 @@ class ConversationRepository(
         )
     }
 
-    private fun ChatMessage.toEntity(conversationId: String): MessageEntity {
+    private fun ChatMessage.toEntity(chatId: String): MessageEntity {
         val attachmentsJsonStr = if (this.attachments.isNotEmpty()) Json.encodeToString(this.attachments) else null
         return MessageEntity(
             id = this.id,
-            conversationId = conversationId,
+            chatId = chatId,
             parentId = this.parentId,
             text = this.text,
             participant = this.participant.name,

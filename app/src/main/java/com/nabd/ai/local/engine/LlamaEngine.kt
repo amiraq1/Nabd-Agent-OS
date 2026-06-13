@@ -103,7 +103,7 @@ class LlamaEngine : LlmProvider, LlamaChatEngine, java.io.Closeable {
         nativeGenerate(nativeContextHandle, request.prompt, request.grammar ?: "", callback)
 
         awaitClose {
-            nativeStopGeneration(nativeContextHandle)
+            nativeAbortGeneration(nativeContextHandle)
             if (_state.value is EngineState.Generating) {
                 _state.value = EngineState.Ready
             }
@@ -134,7 +134,7 @@ class LlamaEngine : LlmProvider, LlamaChatEngine, java.io.Closeable {
     }
 
     override fun cancel() {
-        nativeStopGeneration(nativeContextHandle)
+        nativeAbortGeneration(nativeContextHandle)
     }
 
     override fun close() {
@@ -149,7 +149,7 @@ class LlamaEngine : LlmProvider, LlamaChatEngine, java.io.Closeable {
     private external fun nativeInit(): Long
     private external fun nativeLoadModel(handle: Long, path: String): Boolean
     private external fun nativeGenerate(handle: Long, prompt: String, grammar: String, callback: TokenCallback)
-    private external fun nativeStopGeneration(handle: Long)
+    private external fun nativeAbortGeneration(handle: Long)
     private external fun nativeUnloadModel(handle: Long)
     private external fun nativeRelease(handle: Long)
 

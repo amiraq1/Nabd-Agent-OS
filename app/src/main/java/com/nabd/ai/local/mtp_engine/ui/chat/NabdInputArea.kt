@@ -7,6 +7,7 @@ import androidx.compose.animation.*
 import androidx.compose.animation.core.*
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
+import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.shape.RoundedCornerShape
@@ -24,6 +25,7 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.focus.FocusRequester
 import androidx.compose.ui.focus.focusRequester
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.ImeAction
@@ -65,6 +67,11 @@ fun NabdInputArea(
     val focusRequester = remember { FocusRequester() }
     var showToolBar by remember { mutableStateOf(false) }
 
+    // Use rememberUpdatedState for callbacks to prevent unnecessary recompositions 
+    // when they change in the parent but are captured in stable internal lambdas
+    val currentOnSendMessage by rememberUpdatedState(onSendMessage)
+    val currentOnStopGeneration by rememberUpdatedState(onStopGeneration)
+
     // البنية التكتيكية للحواف الحادة
     val tacticalShape = RoundedCornerShape(2.dp)
 
@@ -86,7 +93,15 @@ fun NabdInputArea(
         modifier = modifier
             .fillMaxWidth()
             .then(if (isExpanded) Modifier.fillMaxHeight() else Modifier)
-            .background(MaterialTheme.colorScheme.surface, tacticalShape)
+            .background(
+                color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.7f), // Floating Glass Effect
+                shape = tacticalShape
+            )
+            .border(
+                width = 0.5.dp,
+                color = MaterialTheme.colorScheme.outline.copy(alpha = 0.3f),
+                shape = tacticalShape
+            )
             .padding(4.dp)
     ) {
         // مؤشر النبض التكتيكي العلوي - يظهر فقط أثناء المعالجة والتوليد
@@ -95,7 +110,7 @@ fun NabdInputArea(
                 modifier = Modifier
                     .fillMaxWidth()
                     .height(2.dp)
-                    .alpha(pulseAlpha)
+                    .graphicsLayer { alpha = pulseAlpha } // Optimization: Avoid recomposition, use draw phase
                     .background(MaterialTheme.colorScheme.primary)
             )
         }
@@ -108,13 +123,16 @@ fun NabdInputArea(
                     .padding(vertical = 6.dp),
                 horizontalArrangement = Arrangement.spacedBy(6.dp)
             ) {
-                items(selectedAttachments.size) { index ->
+                items(
+                    count = selectedAttachments.size,
+                    key = { index -> selectedAttachments[index].uri }
+                ) { index ->
                     val attachment = selectedAttachments[index]
                     Box(
                         modifier = Modifier
                             .size(54.dp)
                             .clip(tacticalShape)
-                            .background(MaterialTheme.colorScheme.surfaceVariant)
+                            .background(MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f))
                     ) {
                         Text(
                             text = attachment.type.uppercase(),
@@ -125,7 +143,7 @@ fun NabdInputArea(
                         Icon(
                             imageVector = Icons.Default.Close,
                             contentDescription = "Remove",
-                            tint = Color.Red,
+                            tint = MaterialTheme.colorScheme.error,
                             modifier = Modifier
                                 .size(14.dp)
                                 .align(Alignment.TopEnd)
@@ -143,7 +161,6 @@ fun NabdInputArea(
             modifier = Modifier
                 .fillMaxWidth()
                 .then(if (isExpanded) Modifier.weight(1f) else Modifier)
-                .background(MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.2f), tacticalShape)
                 .padding(4.dp)
         ) {
             TextField(
@@ -152,6 +169,9 @@ fun NabdInputArea(
                 modifier = Modifier
                     .fillMaxWidth()
                     .focusRequester(focusRequester),
+                textStyle = MaterialTheme.typography.bodyMedium.copy(
+                    color = MaterialTheme.colorScheme.onBackground // White text for clarity
+                ),
                 placeholder = {
                     Text(
                         "ENTER DIRECTIVE...", 
@@ -159,7 +179,7 @@ fun NabdInputArea(
                             fontWeight = FontWeight.Bold,
                             letterSpacing = 1.5.sp
                         ),
-                        color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.5f)
+                        color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.6f) // Slate Gray hint
                     )
                 },
                 maxLines = if (isExpanded) Int.MAX_VALUE else 5,
@@ -167,9 +187,15 @@ fun NabdInputArea(
                     focusedIndicatorColor = Color.Transparent,
                     unfocusedIndicatorColor = Color.Transparent,
                     focusedContainerColor = Color.Transparent,
-                    unfocusedContainerColor = Color.Transparent
+                    unfocusedContainerColor = Color.Transparent,
+                    cursorColor = MaterialTheme.colorScheme.primary
                 )
             )
+        }
+
+        // Use derivedStateOf to prevent button recomposition on every character if the boolean result hasn't changed
+        val canSend by remember {
+            derivedStateOf { textState.text.isNotBlank() || selectedAttachments.isNotEmpty() }
         }
 
         // شريط الأدوات المدمج والرقاقات التكتيكية (Tactical Toolbar)
@@ -222,15 +248,13 @@ fun NabdInputArea(
                     }
                 }
             }
-
-            val canSend = textState.text.isNotBlank() || selectedAttachments.isNotEmpty()
             
             IconButton(
                 onClick = {
                     if (isLoading) {
-                        onStopGeneration()
+                        currentOnStopGeneration()
                     } else if (canSend) {
-                        if (onSendMessage(textState.text, selectedAttachments)) {
+                        if (currentOnSendMessage(textState.text, selectedAttachments)) {
                             selectedAttachments = emptyList()
                             textState = TextFieldValue("")
                         }
@@ -239,7 +263,7 @@ fun NabdInputArea(
                 modifier = Modifier
                     .size(36.dp)
                     .background(
-                        if (isLoading) Color.Red else if (canSend) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.surfaceVariant,
+                        if (isLoading) MaterialTheme.colorScheme.error else if (canSend) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.surfaceVariant,
                         tacticalShape
                     )
             ) {

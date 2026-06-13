@@ -1,10 +1,12 @@
 package com.nabd.ai.local.mtp_engine.architecture
 
+import androidx.compose.runtime.Stable
 import java.util.UUID
 
 /**
  * Participant: Defines the entities involved in a conversation.
  */
+@Stable
 enum class Participant {
     USER,
     ASSISTANT,
@@ -12,6 +14,7 @@ enum class Participant {
     ERROR
 }
 
+@Stable
 enum class MessageStatus {
     TRANSCRIBING, SENDING, THINKING, TOOL_CALLING, SUCCESS, STOPPED, ERROR
 }
@@ -20,6 +23,7 @@ enum class MessageStatus {
  * ChatMessage: Central data model for a conversation turn.
  * Optimized for Modular Task Processor (MTP) architecture.
  */
+@Stable
 data class ChatMessage(
     val id: String = UUID.randomUUID().toString(),
     val text: String,

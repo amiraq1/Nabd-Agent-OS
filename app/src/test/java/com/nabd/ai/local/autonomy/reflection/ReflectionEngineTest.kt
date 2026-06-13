@@ -27,7 +27,7 @@ class ReflectionEngineTest {
             }
         """.trimIndent()
         
-        coEvery { provider.generateText(any(), any()) } returns flowOf(jsonOutput)
+        coEvery { provider.generateResponse(any()) } returns jsonOutput
         
         val engine = ReflectionEngine(provider)
         val step = PlanStep("1", "obj", "rat", "dod", emptyList(), emptyList())

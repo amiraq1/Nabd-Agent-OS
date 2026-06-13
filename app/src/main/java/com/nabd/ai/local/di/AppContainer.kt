@@ -34,6 +34,8 @@ import com.nabd.ai.local.autonomy.safety.ExecutionGuardrails
 import com.nabd.ai.local.autonomy.history.ExecutionTimeline
 import com.nabd.ai.local.autonomy.resources.ResourceMonitor
 import com.nabd.ai.local.autonomy.runtime.AutonomousAgentRunner
+import com.nabd.ai.local.autonomy.metrics.ExecutionMetrics
+import com.nabd.ai.local.autonomy.permission.ToolPermissionManager
 import java.io.File
 
 class AppContainer(private val context: Context) {
@@ -174,8 +176,12 @@ class AppContainer(private val context: Context) {
 
     val sandbox by lazy { com.nabd.ai.local.autonomy.safety.ToolSandbox(workspaceManager.workspaceRoot) }
 
+    val toolPermissionManager by lazy { ToolPermissionManager() }
+
+    val executionMetrics by lazy { ExecutionMetrics() }
+
     val toolOrchestrator by lazy {
-        ToolOrchestrator(engine, toolRegistry, approvalManager, sandbox)
+        ToolOrchestrator(engine, toolRegistry, approvalManager, sandbox, toolPermissionManager)
     }
 
     val knowledgeMemory by lazy { com.nabd.ai.local.autonomy.memory.KnowledgeMemory() }
@@ -191,7 +197,7 @@ class AppContainer(private val context: Context) {
 
     val autonomousAgentRunner by lazy {
         AutonomousAgentRunner(
-            multiAgentCoordinator, replanningManager, sessionManager, executionGuardrails, executionTimeline, resourceMonitor
+            multiAgentCoordinator, replanningManager, sessionManager, executionGuardrails, executionTimeline, resourceMonitor, executionMetrics
         )
     }
 

@@ -3,8 +3,6 @@ package com.nabd.ai.local.memory
 import com.nabd.ai.local.embedding.EmbeddingManager
 import com.nabd.ai.local.embedding.VectorStore
 import com.nabd.ai.local.memory.db.MemoryDao
-import com.nabd.ai.local.memory.db.MemoryEntity
-import com.nabd.ai.local.memory.db.MemoryType
 import io.mockk.coEvery
 import io.mockk.mockk
 import kotlinx.coroutines.flow.flowOf
@@ -26,7 +24,7 @@ class SemanticMemoryRetrieverTest {
         val memoryEntity = MemoryEntity(
             id = "mem1",
             content = "This is a test memory",
-            memoryType = MemoryType.FACT,
+            memoryType = "FACT",
             importance = 8,
             createdAt = System.currentTimeMillis(),
             updatedAt = System.currentTimeMillis()

@@ -34,8 +34,52 @@ class ReplanningEngine(
     }
 
     private fun parsePlanFromJson(json: String): ExecutionPlan {
-        // كود التحليل والتحويل لنموذج ExecutionPlan الفعلي
-        // For now, returning an empty plan as a placeholder for the actual JSON parsing logic
-        return ExecutionPlan(UUID.randomUUID(), emptyList())
+        try {
+            val root = org.json.JSONObject(json)
+            val stepsArray = root.getJSONArray("steps")
+            val stepsList = mutableListOf<PlanStep>()
+
+            for (i in 0 until stepsArray.length()) {
+                val stepObj = stepsArray.getJSONObject(i)
+
+                val reqToolsArr = stepObj.optJSONArray("requiredTools") ?: org.json.JSONArray()
+                val reqTools = List(reqToolsArr.length()) { reqToolsArr.getString(it) }
+
+                val depsArr = stepObj.optJSONArray("dependencies") ?: org.json.JSONArray()
+                val deps = List(depsArr.length()) { depsArr.getString(it) }
+
+                stepsList.add(PlanStep(
+                    id = UUID.randomUUID(),
+                    toolName = stepObj.optString("toolName", reqTools.firstOrNull() ?: "unknown"),
+                    arguments = mapOf("objective" to (stepObj.optString("objective", "") as Any)),
+                    dependencies = if (i > 0 && deps.isEmpty()) {
+                        listOf(stepsList[i - 1].id)
+                    } else {
+                        deps.mapNotNull { depStr ->
+                            try { UUID.fromString(depStr) } catch (_: Exception) {
+                                // If LLM returned indices, map to sequential deps
+                                if (i > 0) stepsList[i - 1].id else null
+                            }
+                        }
+                    },
+                    requiredPermissions = emptyList()
+                ))
+            }
+
+            return ExecutionPlan(UUID.randomUUID(), stepsList)
+        } catch (e: Exception) {
+            android.util.Log.w("ReplanningEngine", "Failed to parse correction plan JSON, creating fallback", e)
+            // Fallback: single-step plan with the raw LLM response as the objective
+            return ExecutionPlan(
+                UUID.randomUUID(),
+                listOf(PlanStep(
+                    id = UUID.randomUUID(),
+                    toolName = "finish",
+                    arguments = mapOf("rawResponse" to json),
+                    dependencies = emptyList(),
+                    requiredPermissions = emptyList()
+                ))
+            )
+        }
     }
 }

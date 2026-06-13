@@ -17,7 +17,12 @@ class LocalSandboxManager(
         if (relativePath.contains("..")) {
             throw SecurityException("Path traversal attempt detected: $relativePath")
         }
-        val targetFile = File(workspaceRoot, relativePath)
+        val file = File(relativePath)
+        val targetFile = if (file.isAbsolute) {
+            file
+        } else {
+            File(workspaceRoot, relativePath)
+        }
         validatePath(targetFile)
         return targetFile
     }

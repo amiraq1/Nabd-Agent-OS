@@ -6,6 +6,8 @@ package com.nabd.ai.local.engine
 interface ProviderRegistry {
     fun register(provider: LlmProvider)
     fun get(providerId: String): LlmProvider
+    fun getOrNull(providerId: String): LlmProvider?
+    fun isRegistered(providerId: String): Boolean
     fun getAll(): List<LlmProvider>
 }
 
@@ -17,10 +19,19 @@ class DefaultProviderRegistry : ProviderRegistry {
     }
 
     override fun get(providerId: String): LlmProvider {
-        return providers[providerId] ?: throw IllegalArgumentException("Provider $providerId not found")
+        return providers[providerId] ?: throw IllegalArgumentException("Provider $providerId not found. Available: ${providers.keys}")
+    }
+
+    override fun getOrNull(providerId: String): LlmProvider? {
+        return providers[providerId]
+    }
+
+    override fun isRegistered(providerId: String): Boolean {
+        return providers.containsKey(providerId)
     }
 
     override fun getAll(): List<LlmProvider> {
         return providers.values.toList()
     }
 }
+

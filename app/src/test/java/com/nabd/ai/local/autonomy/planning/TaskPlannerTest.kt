@@ -34,7 +34,7 @@ class TaskPlannerTest {
             }
         """.trimIndent()
         
-        coEvery { provider.generateText(any(), any()) } returns flowOf(jsonOutput)
+        coEvery { provider.generateResponse(any()) } returns jsonOutput
         
         val planner = TaskPlanner(provider)
         val plan = planner.generatePlan("Goal", listOf("tool1", "tool2"))

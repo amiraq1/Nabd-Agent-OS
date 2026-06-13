@@ -50,7 +50,16 @@ class EngineManager(
         }
 
         try {
-            val engine = providerRegistry.get(providerId)
+            val engine = providerRegistry.getOrNull(providerId) ?: run {
+                val fallback = providerRegistry.getOrNull("local_llama")
+                if (fallback != null) {
+                    android.util.Log.w("EngineManager", "Provider '$providerId' not found, falling back to local_llama")
+                    fallback
+                } else {
+                    _state.value = EngineState.Error(IllegalStateException("Provider '$providerId' not registered. Available: ${providerRegistry.getAll().map { it.id }}"))
+                    return
+                }
+            }
             activeEngine = engine
 
             val config = if (engine.isLocal) {

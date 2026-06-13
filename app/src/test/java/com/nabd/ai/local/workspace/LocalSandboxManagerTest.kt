@@ -33,11 +33,12 @@ class LocalSandboxManagerTest {
         val tempDir = Files.createTempDirectory("workspace_test").toFile()
         val manager = LocalSandboxManager(tempDir)
         
+        val outsideDir = Files.createTempDirectory("outside_test").toFile()
+        val absolutePath = outsideDir.absolutePath
+        
         val exception = assertThrows<SecurityException> {
-            // Passing an absolute path usually gets interpreted relative to the root if not careful,
-            // but File(root, absolute) behaves weirdly. Let's test standard traversal.
-            manager.resolvePath("/etc/passwd")
+            manager.resolvePath(absolutePath)
         }
-        assertTrue(exception.message!!.contains("Path traversal attempt detected"))
+        assertTrue(exception.message!!.contains("Access denied to path outside workspace"))
     }
 }

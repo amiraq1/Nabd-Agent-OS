@@ -34,20 +34,26 @@ class ToolOrchestratorTest {
         }
         registry.register(dummyTool)
         
-        val engineState = MutableStateFlow<EngineState>(EngineState.Loaded)
+        val engineState = MutableStateFlow<EngineState>(EngineState.Ready)
         every { provider.state } returns engineState
         
         // Mock the LLM to output a valid JSON tool call first, then a finish tool call.
         // Since the orchestrator loops, we need to return flows for consecutive calls.
-        coEvery { provider.generateText(any(), any()) } returnsMany listOf(
-            flowOf("""{"tool": "dummy", "parameters": {}}"""),
-            flowOf("""{"tool": "finish", "parameters": {}}""")
+        coEvery { provider.generateResponse(any()) } returnsMany listOf(
+            """{"tool": "dummy", "parameters": {}}""",
+            """{"tool": "finish", "parameters": {}}"""
         )
 
         val approvalManager = mockk<com.nabd.ai.local.agent.approval.ApprovalManager>(relaxed = true)
         val orchestrator = ToolOrchestrator(provider, registry, approvalManager)
         
-        orchestrator.runLoop("Do something")
+        try {
+            orchestrator.runLoop("Do something")
+        } finally {
+            val trace = orchestrator.trace.value.entries
+            println("TRACE LOGS:")
+            trace.forEach { println("${it.type}: ${it.content}") }
+        }
         
         val trace = orchestrator.trace.value.entries
         assertTrue(trace.any { it.content.contains("dummy observation") })

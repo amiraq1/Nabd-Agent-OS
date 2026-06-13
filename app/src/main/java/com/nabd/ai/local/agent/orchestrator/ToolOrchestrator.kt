@@ -10,6 +10,7 @@ import com.nabd.ai.local.agent.trace.ExecutionTrace
 import com.nabd.ai.local.agent.trace.TraceEntry
 import com.nabd.ai.local.agent.trace.TraceType
 import com.nabd.ai.local.autonomy.safety.ToolSandbox
+import com.nabd.ai.local.autonomy.permission.ToolPermissionManager
 import com.nabd.ai.local.engine.LlmProvider
 import com.nabd.ai.local.engine.GenerationRequest
 import kotlinx.coroutines.CompletableDeferred
@@ -23,7 +24,8 @@ class ToolOrchestrator(
     private val provider: LlmProvider,
     private val toolRegistry: ToolRegistry,
     private val approvalManager: ApprovalManager,
-    private val sandbox: ToolSandbox? = null
+    private val sandbox: ToolSandbox? = null,
+    private val permissionManager: ToolPermissionManager? = null
 ) {
     private val _state = MutableStateFlow<AgentExecutionState>(AgentExecutionState.Idle)
     val state: StateFlow<AgentExecutionState> = _state.asStateFlow()
@@ -106,6 +108,24 @@ class ToolOrchestrator(
     }
 
     private suspend fun dispatchTool(name: String, params: String): String {
+        // 0. Permission Check (category-based)
+        val tool = toolRegistry.getTool(name) ?: run {
+            val errorMsg = "Error: Tool not found: $name"
+            addTrace(TraceType.ERROR, errorMsg)
+            return errorMsg
+        }
+
+        permissionManager?.let { pm ->
+            if (pm.requiresPermissionCheck(tool.riskLevel)) {
+                val permCat = ToolPermissionManager.mapToPermissionCategory(tool.category)
+                val permitted = pm.verifyAndRequestPermission(name, permCat)
+                if (!permitted) {
+                    addTrace(TraceType.ERROR, "Permission denied for $name (category: $permCat)")
+                    return "Error: Permission denied for tool $name. User must grant ${permCat.name} permission."
+                }
+            }
+        }
+
         // 1. Sandbox Validation
         sandbox?.let {
             if (!it.validateCommand(params)) {
@@ -115,11 +135,7 @@ class ToolOrchestrator(
             it.auditLog(name, params, allowed = true)
         }
 
-        val tool = toolRegistry.getTool(name) ?: run {
-            val errorMsg = "Error: Tool not found: ${'$'}name"
-            addTrace(TraceType.ERROR, errorMsg)
-            return errorMsg
-        }
+        // Tool already resolved above in permission check
 
         if (tool.requiresHumanApproval) {
             val preview = when (tool) {

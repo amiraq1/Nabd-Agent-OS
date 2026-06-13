@@ -12,6 +12,7 @@ import com.nabd.ai.local.autonomy.replanning.ReplanningManager
 import com.nabd.ai.local.autonomy.resources.ResourceMonitor
 import com.nabd.ai.local.autonomy.safety.ExecutionGuardrails
 import com.nabd.ai.local.autonomy.session.SessionManager
+import com.nabd.ai.local.autonomy.metrics.ExecutionMetrics
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
@@ -23,7 +24,8 @@ class AutonomousAgentRunner(
     private val sessionManager: SessionManager,
     private val guardrails: ExecutionGuardrails,
     private val timeline: ExecutionTimeline,
-    private val resourceMonitor: ResourceMonitor
+    private val resourceMonitor: ResourceMonitor,
+    private val executionMetrics: ExecutionMetrics = ExecutionMetrics()
 ) {
     private val _state = MutableStateFlow(AutonomousExecutionState.IDLE)
     val state: StateFlow<AutonomousExecutionState> = _state.asStateFlow()
@@ -45,6 +47,7 @@ class AutonomousAgentRunner(
         timeline.addEvent(EventType.PLAN_CREATED, "Received goal: ${goal.take(50)}...")
         
         _state.value = AutonomousExecutionState.PLANNING
+        executionMetrics.trackPlanStart()
         
         // Delegate planning to PlannerAgent via Coordinator
         val planningResponse = coordinator.routeTask(AgentRole.PLANNER, goal)
@@ -124,6 +127,8 @@ class AutonomousAgentRunner(
             plan.updateStepState(nextStep.id, StepState.IN_PROGRESS)
             sessionManager.save()
 
+            val stepStartTime = System.currentTimeMillis()
+
             // 1. Execute step via ExecutorAgent
             val executorResponse = coordinator.routeTask(
                 AgentRole.EXECUTOR,
@@ -144,8 +149,10 @@ class AutonomousAgentRunner(
             
             if (eval?.isSuccess == true) {
                 guardrails.recordSuccess()
+                val stepDuration = System.currentTimeMillis() - stepStartTime
+                executionMetrics.trackStepDuration(java.util.UUID.nameUUIDFromBytes(nextStep.id.toByteArray()), stepDuration)
                 plan.updateStepState(nextStep.id, StepState.COMPLETED, observation = orchestratorTrace)
-                timeline.addEvent(EventType.STEP_COMPLETED, "Step completed successfully.")
+                timeline.addEvent(EventType.STEP_COMPLETED, "Step completed in ${stepDuration}ms.")
             } else {
                 guardrails.recordFailure()
                 plan.updateStepState(nextStep.id, StepState.FAILED, error = eval?.reasoning ?: "Unknown failure")

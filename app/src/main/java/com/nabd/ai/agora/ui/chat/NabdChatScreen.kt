@@ -139,7 +139,7 @@ fun NabdChatInputArea(onSend: (String) -> Unit) {
                     .weight(1f)
                     .clip(RoundedCornerShape(24.dp)),
                 placeholder = { Text("Send a directive...", fontSize = 14.sp) },
-                colors = TextFieldDefaults.textFieldColors(
+                colors = TextFieldDefaults.colors(
                     focusedIndicatorColor = Color.Transparent,
                     unfocusedIndicatorColor = Color.Transparent
                 ),

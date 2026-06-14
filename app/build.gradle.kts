@@ -69,10 +69,6 @@ android {
             // فرض عدم الضغط لملفات الـ .so لمنع الـ Memory Spikes تماماً
             useLegacyPackaging = true
         }
-        dex {
-            // منع ضغط ملفات الـ dex أيضاً في نسخة الـ Debug
-            useLegacyPackaging = true
-        }
     }
 
     externalNativeBuild {
@@ -102,7 +98,7 @@ dependencies {
     implementation("androidx.navigation:navigation-compose:2.8.1")
     
     // MaterialKolor for dynamic themes
-    implementation("com.materialkolor:material-color-utilities:1.7.0")
+    implementation("com.materialkolor:material-kolor:1.7.0")
 
     // Coroutines
     implementation("org.jetbrains.kotlinx:kotlinx-coroutines-android:1.7.3")

@@ -1,6 +1,7 @@
 #include "LlamaRuntimeContext.hpp"
 #include <android/log.h>
 #include <thread>
+#include <cstring>
 
 #define TAG "LlamaRuntime"
 #define LOGI(...) __android_log_print(ANDROID_LOG_INFO, TAG, __VA_ARGS__)
@@ -20,6 +21,7 @@ static void batch_add(llama_batch & batch, llama_token id, llama_pos pos, const 
 
 LlamaRuntimeContext::LlamaRuntimeContext() 
     : is_loaded(false), is_generating(false), stop_requested(false) {
+    memset(&batch, 0, sizeof(batch));
     llama_backend_init();
 }
 
@@ -53,7 +55,7 @@ bool LlamaRuntimeContext::loadModel(const std::string& path) {
         return false;
     }
 
-    batch = llama_batch_init(512, 0, 1);
+    batch = llama_batch_init(ctx_params.n_ctx, 0, 1);
     is_loaded = true;
     return true;
 }

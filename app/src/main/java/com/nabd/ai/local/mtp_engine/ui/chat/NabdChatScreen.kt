@@ -152,8 +152,6 @@ fun NabdChatScreen(
     }
 }
 
-import androidx.compose.material.icons.filled.Analytics
-
 @Composable
 fun NabdTopAppBar(
     currentModel: String?,

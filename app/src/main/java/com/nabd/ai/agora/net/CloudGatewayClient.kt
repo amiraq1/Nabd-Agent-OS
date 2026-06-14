@@ -1,5 +1,6 @@
 package com.nabd.ai.agora.net
 
+import android.util.Log
 import com.nabd.ai.agora.api.HttpClient
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.Flow
@@ -45,7 +46,7 @@ class CloudGatewayClient {
                 "deepseek" -> "deepseek-chat"
                 "qwen" -> "qwen-max"
                 "open router", "openrouter" -> "google/gemini-flash-1.5"
-                "nvidia" -> "meta/llama-3.1-405b-instruct"
+                "nvidia" -> "meta/llama3-8b-instruct"
                 "ollama" -> "llama3"
                 "google" -> "gemini-pro"
                 else -> "gpt-4o"
@@ -85,6 +86,7 @@ class CloudGatewayClient {
         val handle = try {
             HttpClient.streamPost(endpoint, body.toString(), headers)
         } catch (e: Exception) {
+            Log.e("NabdGateway", "Failed to initiate stream post", e)
             emit("❌ [GATEWAY_ERROR]: Network Failure")
             return@flow
         }
@@ -102,6 +104,8 @@ class CloudGatewayClient {
             val source = handle.source ?: return@flow
             while (true) {
                 val line = handle.readLine() ?: break
+                Log.d("NabdGateway", "Raw Stream Line: $line")
+
                 if (line.isBlank()) continue
                 if (line.startsWith(":")) continue
 
@@ -111,16 +115,25 @@ class CloudGatewayClient {
 
                     try {
                         val element = json.parseToJsonElement(data)
+                        
+                        // Check for provider error payloads
+                        if (element is JsonObject && element.containsKey("error")) {
+                            Log.e("NabdGateway", "Provider error payload: $data")
+                        }
+
                         val token = when (provider.lowercase().trim()) {
                             "anthropic" -> element.jsonObject["delta"]?.jsonObject?.get("text")?.takeIf { it !is JsonNull }?.jsonPrimitive?.content
-                            "google" -> element.jsonObject["candidates"]?.jsonArray?.get(0)?.jsonObject?.get("content")?.jsonObject?.get("parts")?.jsonArray?.get(0)?.jsonObject?.get("text")?.takeIf { it !is JsonNull }?.jsonPrimitive?.content
-                            else -> element.jsonObject["choices"]?.jsonArray?.get(0)?.jsonObject?.get("delta")?.jsonObject?.get("content")?.takeIf { it !is JsonNull }?.jsonPrimitive?.content
+                            "google" -> element.jsonObject["candidates"]?.jsonArray?.getOrNull(0)?.jsonObject?.get("content")?.jsonObject?.get("parts")?.jsonArray?.getOrNull(0)?.jsonObject?.get("text")?.takeIf { it !is JsonNull }?.jsonPrimitive?.content
+                            else -> element.jsonObject["choices"]?.jsonArray?.getOrNull(0)?.jsonObject?.get("delta")?.jsonObject?.get("content")?.takeIf { it !is JsonNull }?.jsonPrimitive?.content
                         }
                         if (token != null) emit(token)
-                    } catch (_: Exception) {}
+                    } catch (e: Exception) {
+                        Log.e("NabdGateway", "Parsing failed for chunk data: $data", e)
+                    }
                 }
             }
         } catch (e: Exception) {
+            Log.e("NabdGateway", "Streaming loop error", e)
             emit("❌ [GATEWAY_ERROR]: Streaming Interrupted")
         } finally {
             handle.close()

@@ -6,20 +6,31 @@ import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.Build
-import androidx.compose.material.icons.filled.Lock
-import androidx.compose.material.icons.filled.Refresh
+import androidx.compose.material.icons.automirrored.filled.ArrowBack
+import androidx.compose.material.icons.outlined.Key
+import androidx.compose.material.icons.outlined.Memory
+import androidx.compose.material.icons.outlined.Tune
 import androidx.compose.material.icons.filled.Settings
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
+import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import androidx.lifecycle.viewmodel.compose.viewModel
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.input.KeyboardType
+import androidx.compose.ui.text.input.PasswordVisualTransformation
+import androidx.compose.ui.text.input.VisualTransformation
+import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import androidx.compose.animation.AnimatedVisibility
+import androidx.compose.animation.expandVertically
+import androidx.compose.animation.shrinkVertically
+import kotlin.math.roundToInt
 
 // الألوان التكتيكية (Cyberpunk Matrix Theme)
 val NeonGreen = Color(0xFF00FF66)
@@ -29,10 +40,15 @@ val MutedText = Color(0xFF8A94A6)
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-fun SettingsPage() {
-    var isLocalEngine by remember { mutableStateOf(true) }
-    var threadCount by remember { mutableFloatStateOf(4f) }
-    var apiKey by remember { mutableStateOf("") }
+fun SettingsPage(
+    onBack: () -> Unit = {},
+    viewModel: SettingsViewModel = viewModel(factory = SettingsViewModel.Factory(androidx.compose.ui.platform.LocalContext.current.applicationContext as android.app.Application))
+) {
+    val isLocalEngine by viewModel.isLocalEngine.collectAsStateWithLifecycle()
+    val threadCount by viewModel.threadCount.collectAsStateWithLifecycle()
+    val apiKey by viewModel.nvidiaApiKey.collectAsStateWithLifecycle()
+
+    var keyVisible by remember { mutableStateOf(false) }
 
     Scaffold(
         topBar = {
@@ -45,6 +61,15 @@ fun SettingsPage() {
                         fontWeight = FontWeight.Bold,
                         fontFamily = FontFamily.Monospace
                     ) 
+                },
+                navigationIcon = {
+                    IconButton(onClick = onBack) {
+                        Icon(
+                            imageVector = Icons.AutoMirrored.Filled.ArrowBack,
+                            contentDescription = "Back",
+                            tint = NeonGreen
+                        )
+                    }
                 },
                 colors = TopAppBarDefaults.topAppBarColors(containerColor = TacticalBackground)
             )
@@ -63,7 +88,7 @@ fun SettingsPage() {
             // GRID LAYOUT: Bento Box 1 - AI Engine
             BentoSettingsCard(
                 title = "INFERENCE ENGINE",
-                icon = Icons.Default.Settings,
+                icon = Icons.Outlined.Memory,
                 modifier = Modifier.fillMaxWidth()
             ) {
                 Row(
@@ -71,38 +96,52 @@ fun SettingsPage() {
                     horizontalArrangement = Arrangement.SpaceBetween,
                     verticalAlignment = Alignment.CenterVertically
                 ) {
-                    Text("Execute Model Locally", color = Color.White, fontFamily = FontFamily.Monospace)
+                    Column {
+                        Text("Execute Model Locally", color = Color.White, fontFamily = FontFamily.Monospace)
+                        Text(
+                            text = if (isLocalEngine) "Mode: llama.cpp Core" else "Mode: Cloud Gateway",
+                            color = NeonGreen,
+                            fontSize = 12.sp,
+                            fontFamily = FontFamily.Monospace
+                        )
+                    }
                     Switch(
                         checked = isLocalEngine,
-                        onCheckedChange = { isLocalEngine = it },
+                        onCheckedChange = { viewModel.updateEngineMode(it) },
                         colors = SwitchDefaults.colors(checkedThumbColor = NeonGreen)
                     )
                 }
-                Spacer(modifier = Modifier.height(8.dp))
-                Text(
-                    text = if (isLocalEngine) "Mode: llama.cpp GGUF Core" else "Mode: Cloud API Gateway",
-                    color = NeonGreen,
-                    fontSize = 12.sp,
-                    fontFamily = FontFamily.Monospace
-                )
             }
 
             // Bento Box 2 - Resource Allocation (Crucial for Termux/Android stability)
             BentoSettingsCard(
                 title = "RESOURCE ALLOCATION",
-                icon = Icons.Default.Refresh,
+                icon = Icons.Outlined.Tune,
                 modifier = Modifier.fillMaxWidth()
             ) {
-                Text(
-                    text = "CPU Threads: ${threadCount.toInt()}",
-                    color = Color.White,
-                    fontFamily = FontFamily.Monospace
-                )
+                Row(
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.SpaceBetween,
+                    modifier = Modifier.fillMaxWidth()
+                ) {
+                    Text(
+                        text = "CPU Threads: ${threadCount}",
+                        color = Color.White,
+                        fontFamily = FontFamily.Monospace
+                    )
+                    Text(
+                        text = "ACTIVE",
+                        color = NeonGreen,
+                        fontSize = 10.sp,
+                        fontWeight = FontWeight.Bold,
+                        fontFamily = FontFamily.Monospace
+                    )
+                }
                 Slider(
-                    value = threadCount,
-                    onValueChange = { threadCount = it },
-                    valueRange = 1f..8f,
-                    steps = 7,
+                    value = threadCount.toFloat(),
+                    onValueChange = { viewModel.updateThreadCount(it.roundToInt()) },
+                    valueRange = 1f..16f,
+                    steps = 14,
                     colors = SliderDefaults.colors(
                         thumbColor = NeonGreen,
                         activeTrackColor = NeonGreen
@@ -117,25 +156,43 @@ fun SettingsPage() {
             }
 
             // Bento Box 3 - Sandbox Security Context
-            BentoSettingsCard(
-                title = "SECURITY & ENVIRONMENT",
-                icon = Icons.Default.Lock,
-                modifier = Modifier.fillMaxWidth()
+            AnimatedVisibility(
+                visible = !isLocalEngine,
+                enter = expandVertically(),
+                exit = shrinkVertically()
             ) {
-                Text("NVIDIA NIM API KEY", color = Color.White, fontFamily = FontFamily.Monospace, fontSize = 12.sp)
-                Spacer(modifier = Modifier.height(8.dp))
-                OutlinedTextField(
-                    value = apiKey,
-                    onValueChange = { apiKey = it },
-                    placeholder = { Text("env: NVIDIA_NIM_API_KEY", color = MutedText) },
-                    singleLine = true,
-                    textStyle = androidx.compose.ui.text.TextStyle(color = Color.White, fontFamily = FontFamily.Monospace),
-                    modifier = Modifier.fillMaxWidth(),
-                    colors = OutlinedTextFieldDefaults.colors(
-                        focusedBorderColor = NeonGreen,
-                        unfocusedBorderColor = MutedText
+                BentoSettingsCard(
+                    title = "SECURITY & ENVIRONMENT",
+                    icon = Icons.Outlined.Key,
+                    modifier = Modifier.fillMaxWidth()
+                ) {
+                    Text("NVIDIA NIM API KEY", color = Color.White, fontFamily = FontFamily.Monospace, fontSize = 12.sp)
+                    Spacer(modifier = Modifier.height(8.dp))
+                    OutlinedTextField(
+                        value = apiKey,
+                        onValueChange = { viewModel.updateApiKey(it) },
+                        placeholder = { Text("nvapi-...", color = MutedText) },
+                        singleLine = true,
+                        textStyle = androidx.compose.ui.text.TextStyle(color = Color.White, fontFamily = FontFamily.Monospace),
+                        modifier = Modifier.fillMaxWidth(),
+                        keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Password),
+                        visualTransformation = if (keyVisible) VisualTransformation.None else PasswordVisualTransformation(),
+                        trailingIcon = {
+                            TextButton(onClick = { keyVisible = !keyVisible }) {
+                                Text(
+                                    if (keyVisible) "HIDE" else "SHOW",
+                                    color = NeonGreen,
+                                    fontSize = 10.sp,
+                                    fontFamily = FontFamily.Monospace
+                                )
+                            }
+                        },
+                        colors = OutlinedTextFieldDefaults.colors(
+                            focusedBorderColor = NeonGreen,
+                            unfocusedBorderColor = MutedText
+                        )
                     )
-                )
+                }
             }
         }
     }

@@ -32,7 +32,8 @@ import com.nabd.ai.local.mtp_engine.ui.components.IntelligenceFlowIndicator
 @Composable
 fun NabdChatScreen(
     viewModel: ChatViewModel,
-    modifier: Modifier = Modifier
+    modifier: Modifier = Modifier,
+    onSettingsClick: () -> Unit = {}
 ) {
     val uiState by viewModel.state.collectAsState()
     val listState = rememberLazyListState()
@@ -56,7 +57,8 @@ fun NabdChatScreen(
             NabdTopAppBar(
                 currentModel = uiState.selectedModel,
                 onNewChat = { viewModel.dispatch(NabdAction.ResetConversation) },
-                onMemoryClick = { /* Future: Semantic Memory View */ }
+                onMemoryClick = { /* Future: Semantic Memory View */ },
+                onSettingsClick = onSettingsClick
             ) 
         },
         bottomBar = {
@@ -148,7 +150,8 @@ fun NabdChatScreen(
 fun NabdTopAppBar(
     currentModel: String?,
     onNewChat: () -> Unit,
-    onMemoryClick: () -> Unit
+    onMemoryClick: () -> Unit,
+    onSettingsClick: () -> Unit
 ) {
     Row(
         modifier = Modifier
@@ -173,7 +176,7 @@ fun NabdTopAppBar(
             }
         }
 
-        // كبسولة العنوان وشعار نبض جهة اليمين
+        // كبسولة العنوان وشعار نبض جهة اليمين مع زر الإعدادات التكتيكي
         Row(
             modifier = Modifier
                 .background(MaterialTheme.colorScheme.surface, RoundedCornerShape(50.dp))
@@ -187,7 +190,14 @@ fun NabdTopAppBar(
                 fontSize = 16.sp,
                 modifier = Modifier.padding(end = 8.dp)
             )
-            Icon(Icons.Default.Menu, contentDescription = "Menu", tint = MaterialTheme.colorScheme.onSurface)
+            IconButton(onClick = onSettingsClick, modifier = Modifier.size(24.dp)) {
+                Icon(
+                    Icons.Default.Settings, 
+                    contentDescription = "System Configuration", 
+                    tint = Color(0xFF00FF66), // Neon Green
+                    modifier = Modifier.size(18.dp)
+                )
+            }
         }
     }
 }

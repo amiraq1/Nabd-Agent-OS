@@ -19,8 +19,10 @@ import androidx.lifecycle.ViewModelProvider
 import com.nabd.ai.local.di.AppContainer
 import com.nabd.ai.local.mtp_engine.ui.chat.NabdChatScreen
 import com.nabd.ai.local.ui.ChatViewModel
-import com.nabd.ai.local.ui.SettingsScreen
-import com.nabd.ai.local.ui.SettingsViewModel
+import com.nabd.ai.agora.ui.settings.SettingsPage
+import com.nabd.ai.agora.ui.settings.SettingsViewModel
+import androidx.compose.ui.platform.LocalContext
+import android.app.Application
 import kotlinx.coroutines.launch
 
 sealed class AppRoute {
@@ -43,12 +45,9 @@ fun AvantGardeAppLayout(appContainer: AppContainer) {
     )
 
     val settingsViewModel: SettingsViewModel = viewModel(
-        factory = object : ViewModelProvider.Factory {
-            override fun <T : ViewModel> create(modelClass: Class<T>): T {
-                @Suppress("UNCHECKED_CAST")
-                return appContainer.provideSettingsViewModel() as T
-            }
-        }
+        factory = SettingsViewModel.Factory(
+            app = LocalContext.current.applicationContext as Application
+        )
     )
 
     Box(
@@ -63,7 +62,10 @@ fun AvantGardeAppLayout(appContainer: AppContainer) {
         ) { route ->
             when (route) {
                 is AppRoute.Chat -> {
-                    NabdChatScreen(chatViewModel)
+                    NabdChatScreen(
+                        viewModel = chatViewModel,
+                        onSettingsClick = { activeRoute = AppRoute.Settings }
+                    )
                 }
                 is AppRoute.Autonomy -> {
                     val agentRunner = appContainer.autonomousAgentRunner
@@ -87,18 +89,9 @@ fun AvantGardeAppLayout(appContainer: AppContainer) {
                     )
                 }
                 is AppRoute.Settings -> {
-                    val uiState by settingsViewModel.uiState.collectAsState()
-                    SettingsScreen(
-                        uiState = uiState,
-                        onImport = settingsViewModel::importModel,
-                        onSelect = settingsViewModel::selectModel,
-                        onDelete = settingsViewModel::deleteModel,
-                        onImportDocument = settingsViewModel::importDocument,
-                        onDeleteDocument = settingsViewModel::deleteDocument,
-                        onProviderSelect = settingsViewModel::setProvider,
-                        onOpenAiKeyChange = settingsViewModel::setOpenAiApiKey,
-                        onGeminiKeyChange = settingsViewModel::setGeminiApiKey,
-                        onAnthropicKeyChange = settingsViewModel::setAnthropicApiKey
+                    SettingsPage(
+                        viewModel = settingsViewModel,
+                        onBack = { activeRoute = AppRoute.Chat }
                     )
                 }
             }

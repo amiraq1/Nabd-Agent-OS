@@ -15,3 +15,6 @@
 - Structure complex migration tasks with explicit: audit requirements, deliverable format, compatibility impact, security impact, and validation results per task. Confidence: 0.70
 - Preserve backward compatibility and lifecycle behavior when refactoring dependency containers. Confidence: 0.75
 
+# kotlin
+- Always trim and lowercase provider strings when doing string comparisons (e.g., `provider.lowercase().trim()`). Confidence: 0.75
+

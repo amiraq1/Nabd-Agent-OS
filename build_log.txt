@@ -1,0 +1,77 @@
+To honour the JVM settings for this build a single-use Daemon process will be forked. For more on this, please refer to https://docs.gradle.org/8.6/userguide/gradle_daemon.html#sec:disabling_the_daemon in the Gradle documentation.
+Daemon will be stopped at the end of the build 
+Calculating task graph as configuration cache cannot be reused because file 'app/build.gradle.kts' has changed.
+Watching the file system is not supported.
+
+> Configure project :app
+WARNING: The option setting 'android.aapt2FromMavenOverride=/data/data/com.termux/files/usr/bin/aapt2' is experimental.
+
+> Task :app:preBuild UP-TO-DATE
+> Task :app:preDebugBuild UP-TO-DATE
+> Task :app:mergeDebugNativeDebugMetadata NO-SOURCE
+> Task :app:checkKotlinGradlePluginConfigurationErrors
+> Task :app:generateDebugResValues UP-TO-DATE
+> Task :app:mapDebugSourceSetPaths UP-TO-DATE
+> Task :app:generateDebugResources UP-TO-DATE
+> Task :app:checkDebugAarMetadata
+> Task :app:packageDebugResources UP-TO-DATE
+> Task :app:mergeDebugResources UP-TO-DATE
+> Task :app:createDebugCompatibleScreenManifests UP-TO-DATE
+> Task :app:extractDeepLinksDebug UP-TO-DATE
+> Task :app:parseDebugLocalResources UP-TO-DATE
+> Task :app:javaPreCompileDebug UP-TO-DATE
+> Task :app:mergeDebugShaders UP-TO-DATE
+> Task :app:compileDebugShaders NO-SOURCE
+> Task :app:generateDebugAssets UP-TO-DATE
+> Task :app:mergeDebugAssets UP-TO-DATE
+> Task :app:compressDebugAssets UP-TO-DATE
+> Task :app:desugarDebugFileDependencies UP-TO-DATE
+> Task :app:checkDebugDuplicateClasses
+> Task :app:mergeDebugStartupProfile UP-TO-DATE
+> Task :app:processDebugMainManifest
+> Task :app:processDebugManifest UP-TO-DATE
+> Task :app:processDebugManifestForPackage UP-TO-DATE
+> Task :app:processDebugResources
+> Task :app:mergeExtDexDebug
+> Task :app:mergeLibDexDebug UP-TO-DATE
+
+> Task :app:configureCMakeDebug[arm64-v8a]
+[CXX5304] This version only understands SDK XML versions up to 3 but an SDK XML file of version 4 was encountered. This can happen if you use versions of Android Studio and the command-line tools that were released at different times.
+[CXX5304] This version only understands SDK XML versions up to 3 but an SDK XML file of version 4 was encountered. This can happen if you use versions of Android Studio and the command-line tools that were released at different times.
+C/C++: CMake Deprecation Warning at /data/data/com.termux/files/home/android-sdk/ndk/27.3.13750724/build/cmake/android.toolchain.cmake:35 (cmake_minimum_required):
+C/C++:   Compatibility with CMake < 3.10 will be removed from a future version of
+C/C++:   CMake.
+C/C++:   Update the VERSION argument <min> value.  Or, use the <min>...<max> syntax
+C/C++:   to tell CMake that the project requires at least <min> but has been updated
+C/C++:   to work with policies introduced by <max> or earlier.
+C/C++: Call Stack (most recent call first):
+C/C++:   /data/data/com.termux/files/usr/share/cmake-4.3/Modules/CMakeDetermineSystem.cmake:146 (include)
+C/C++:   CMakeLists.txt:3 (project)
+C/C++: CMake Deprecation Warning at /data/data/com.termux/files/home/android-sdk/ndk/27.3.13750724/build/cmake/android-legacy.toolchain.cmake:35 (cmake_minimum_required):
+C/C++:   Compatibility with CMake < 3.10 will be removed from a future version of
+C/C++:   CMake.
+C/C++:   Update the VERSION argument <min> value.  Or, use the <min>...<max> syntax
+C/C++:   to tell CMake that the project requires at least <min> but has been updated
+C/C++:   to work with policies introduced by <max> or earlier.
+C/C++: Call Stack (most recent call first):
+C/C++:   /data/data/com.termux/files/home/android-sdk/ndk/27.3.13750724/build/cmake/android.toolchain.cmake:55 (include)
+C/C++:   /data/data/com.termux/files/usr/share/cmake-4.3/Modules/CMakeDetermineSystem.cmake:146 (include)
+C/C++:   CMakeLists.txt:3 (project)
+C/C++: CMake Deprecation Warning at /data/data/com.termux/files/home/android-sdk/ndk/27.3.13750724/build/cmake/android.toolchain.cmake:35 (cmake_minimum_required):
+C/C++:   Compatibility with CMake < 3.10 will be removed from a future version of
+C/C++:   CMake.
+C/C++:   Update the VERSION argument <min> value.  Or, use the <min>...<max> syntax
+C/C++:   to tell CMake that the project requires at least <min> but has been updated
+C/C++:   to work with policies introduced by <max> or earlier.
+C/C++: Call Stack (most recent call first):
+C/C++:   /data/data/com.termux/files/home/Nabd-Agent-OS/app/.cxx/Debug/6gt6f646/arm64-v8a/CMakeFiles/4.3.3/CMakeSystem.cmake:6 (include)
+C/C++:   CMakeLists.txt:3 (project)
+
+> Task :app:kspDebugKotlin
+w: [ksp] /data/data/com.termux/files/home/Nabd-Agent-OS/app/src/main/java/com/nabd/ai/agora/data/local/ChatDatabase.kt:203: Schema export directory was not provided to the annotation processor so Room cannot export the schema. You can either provide `room.schemaLocation` annotation processor argument by applying the Room Gradle plugin (id 'androidx.room') OR set exportSchema to false.
+w: [ksp] /data/data/com.termux/files/home/Nabd-Agent-OS/app/src/main/java/com/nabd/ai/local/memory/db/MemoryDatabase.kt:30: Schema export directory was not provided to the annotation processor so Room cannot export the schema. You can either provide `room.schemaLocation` annotation processor argument by applying the Room Gradle plugin (id 'androidx.room') OR set exportSchema to false.
+
+> Task :app:compileDebugKotlin
+e: file:///data/data/com.termux/files/home/Nabd-Agent-OS/app/src/main/java/com/nabd/ai/agora/ui/chat/NabdChatScreen.kt:142:44 Unresolved reference: textFieldColors
+
+> Task :app:compileDebugKotlin FAILED

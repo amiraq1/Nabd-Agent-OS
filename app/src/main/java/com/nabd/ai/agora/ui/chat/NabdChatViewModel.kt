@@ -41,14 +41,15 @@ class NabdChatViewModel(application: Application) : AndroidViewModel(application
         _chatMessages.update { it + userMessage + assistantPlaceholder }
 
         viewModelScope.launch {
-            val provider = settingsRepository.activeProvider.first()
-            val apiKey = when (provider.lowercase()) {
+            val provider = settingsRepository.activeProvider.first().lowercase().trim()
+            val apiKey = when (provider) {
                 "google" -> settingsRepository.googleApiKey.first()
                 "openai" -> settingsRepository.openAiApiKey.first()
                 "anthropic" -> settingsRepository.anthropicApiKey.first()
                 "deepseek" -> settingsRepository.deepSeekApiKey.first()
                 "qwen" -> settingsRepository.qwenApiKey.first()
                 "openrouter" -> settingsRepository.openRouterApiKey.first()
+                "nvidia" -> settingsRepository.nvidiaApiKey.first()
                 else -> settingsRepository.openAiApiKey.first()
             }
             val contextWindow = settingsRepository.contextWindowSize.first()

@@ -16,40 +16,42 @@ class CloudGatewayClient {
         apiKey: String,
         contextWindow: Int
     ): Flow<String> = flow {
-        val endpoint = when (provider.lowercase()) {
+        val endpoint = when (provider.lowercase().trim()) {
             "openai" -> "https://api.openai.com/v1/chat/completions"
             "anthropic" -> "https://api.anthropic.com/v1/messages"
             "deepseek" -> "https://api.deepseek.com/v1/chat/completions"
             "qwen" -> "https://dashscope-intl.aliyuncs.com/compatible-mode/v1/chat/completions"
             "open router", "openrouter" -> "https://openrouter.ai/api/v1/chat/completions"
+            "nvidia" -> "https://integrate.api.nvidia.com/v1/chat/completions"
             "ollama" -> "http://localhost:11434/api/chat"
             "google" -> "https://generativelanguage.googleapis.com/v1beta/models/gemini-pro:streamGenerateContent?key=$apiKey"
             else -> "https://api.openai.com/v1/chat/completions"
         }
 
         val headers = mutableMapOf("Content-Type" to "application/json")
-        if (provider.lowercase() == "anthropic") {
+        if (provider.lowercase().trim() == "anthropic") {
             headers["x-api-key"] = apiKey
             headers["anthropic-version"] = "2023-06-01"
-        } else if (provider.lowercase() != "google") {
+        } else if (provider.lowercase().trim() != "google") {
             if (apiKey.isNotEmpty()) {
                 headers["Authorization"] = "Bearer $apiKey"
             }
         }
 
         val body = buildJsonObject {
-            val model = when (provider.lowercase()) {
+            val model = when (provider.lowercase().trim()) {
                 "openai" -> "gpt-4o"
                 "anthropic" -> "claude-3-5-sonnet-20240620"
                 "deepseek" -> "deepseek-chat"
                 "qwen" -> "qwen-max"
                 "open router", "openrouter" -> "google/gemini-flash-1.5"
+                "nvidia" -> "meta/llama-3.1-405b-instruct"
                 "ollama" -> "llama3"
                 "google" -> "gemini-pro"
                 else -> "gpt-4o"
             }
-            
-            if (provider.lowercase() == "google") {
+
+            if (provider.lowercase().trim() == "google") {
                 putJsonArray("contents") {
                     addJsonObject {
                         put("role", "user")
@@ -58,7 +60,7 @@ class CloudGatewayClient {
                         }
                     }
                 }
-            } else if (provider.lowercase() == "anthropic") {
+            } else if (provider.lowercase().trim() == "anthropic") {
                 put("model", model)
                 putJsonArray("messages") {
                     addJsonObject {
@@ -101,37 +103,21 @@ class CloudGatewayClient {
             while (true) {
                 val line = handle.readLine() ?: break
                 if (line.isBlank()) continue
-                
-                // Keep-alive lines (often starting with : or just empty)
                 if (line.startsWith(":")) continue
-                
+
                 if (line.startsWith("data: ")) {
                     val data = line.removePrefix("data: ").trim()
                     if (data == "[DONE]") break
 
                     try {
                         val element = json.parseToJsonElement(data)
-                        val token = when (provider.lowercase()) {
-                            "anthropic" -> {
-                                element.jsonObject["delta"]?.jsonObject?.get("text")?.jsonPrimitive?.content
-                            }
-                            "google" -> {
-                                element.jsonObject["candidates"]?.jsonArray?.get(0)
-                                    ?.jsonObject?.get("content")
-                                    ?.jsonObject?.get("parts")
-                                    ?.jsonArray?.get(0)
-                                    ?.jsonObject?.get("text")?.jsonPrimitive?.content
-                            }
-                            else -> {
-                                element.jsonObject["choices"]?.jsonArray?.get(0)
-                                    ?.jsonObject?.get("delta")
-                                    ?.jsonObject?.get("content")?.jsonPrimitive?.content
-                            }
+                        val token = when (provider.lowercase().trim()) {
+                            "anthropic" -> element.jsonObject["delta"]?.jsonObject?.get("text")?.takeIf { it !is JsonNull }?.jsonPrimitive?.content
+                            "google" -> element.jsonObject["candidates"]?.jsonArray?.get(0)?.jsonObject?.get("content")?.jsonObject?.get("parts")?.jsonArray?.get(0)?.jsonObject?.get("text")?.takeIf { it !is JsonNull }?.jsonPrimitive?.content
+                            else -> element.jsonObject["choices"]?.jsonArray?.get(0)?.jsonObject?.get("delta")?.jsonObject?.get("content")?.takeIf { it !is JsonNull }?.jsonPrimitive?.content
                         }
                         if (token != null) emit(token)
-                    } catch (_: Exception) {
-                        // Ignore malformed chunks safely
-                    }
+                    } catch (_: Exception) {}
                 }
             }
         } catch (e: Exception) {

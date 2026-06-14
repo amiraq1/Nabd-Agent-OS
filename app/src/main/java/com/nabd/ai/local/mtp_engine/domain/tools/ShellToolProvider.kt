@@ -1,12 +1,14 @@
 package com.nabd.ai.local.mtp_engine.domain.tools
 
+import android.util.Log
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import java.io.File
 
 /**
  * ShellToolProvider: Tactical CLI Execution.
- * Intentional Minimalism - Executes commands in the host environment (Termux).
+ * Executes commands in the host environment (Termux) with
+ * environment variable propagation for secure credential access.
  */
 class ShellToolProvider(
     private val workingDirectory: File
@@ -20,12 +22,23 @@ class ShellToolProvider(
         try {
             val command = extractCommand(arguments)
             
-            // تنفيذ الأوامر الطرفية مباشرة داخل بيئة Termux المضيفة
-            val process = ProcessBuilder()
+            val pb = ProcessBuilder()
                 .command("sh", "-c", command)
                 .directory(workingDirectory)
-                .redirectErrorStream(true) // دمج مخرجات الخطأ مع المخرجات القياسية
-                .start()
+                .redirectErrorStream(true)
+
+            // Propagate critical environment variables to child processes.
+            // Existence is logged; the value itself is never exposed.
+            pb.environment().let { env ->
+                System.getenv("NVIDIA_NIM_API_KEY")?.let { key ->
+                    if (key.isNotBlank()) {
+                        env["NVIDIA_NIM_API_KEY"] = key
+                        Log.i("ShellToolProvider", "NVIDIA_NIM_API_KEY detected")
+                    }
+                }
+            }
+
+            val process = pb.start()
 
             // قراءة المخرجات بفعالية
             val output = process.inputStream.bufferedReader().use { it.readText() }.trim()

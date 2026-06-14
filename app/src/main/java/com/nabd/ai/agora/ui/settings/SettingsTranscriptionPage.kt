@@ -143,11 +143,8 @@ fun SettingsTranscriptionPage(viewModel: ChatViewModel, onBack: () -> Unit) {
                                                 Icon(Icons.Default.MoreVert, contentDescription = stringResource(R.string.options), modifier = Modifier.size(18.dp))
                                             }
                                             DropdownMenu(
-                                                containerColor = MaterialTheme.colorScheme.surfaceContainer,
-                                                tonalElevation = 16.dp,
                                                 expanded = showMenuForModel == model,
-                                                onDismissRequest = { showMenuForModel = null },
-                                                shape = RoundedCornerShape(12.dp)
+                                                onDismissRequest = { showMenuForModel = null }
                                             ) {
                                                 DropdownMenuItem(
                                                     text = { Text(stringResource(R.string.delete), color = MaterialTheme.colorScheme.error) },

@@ -189,11 +189,8 @@ fun SettingsSearchPage(viewModel: ChatViewModel, onBack: () -> Unit) {
                                         textAlign = TextAlign.Center
                                     )
                                     DropdownMenu(
-                                        containerColor = MaterialTheme.colorScheme.surfaceContainer,
-                                        tonalElevation = 16.dp,
                                         expanded = expanded,
-                                        onDismissRequest = { expanded = false },
-                                        shape = RoundedCornerShape(12.dp)
+                                        onDismissRequest = { expanded = false }
                                     ) {
                                         val noEmbedding = embeddingModels.isEmpty()
                                         searchMethods.forEach { method ->
@@ -234,11 +231,8 @@ fun SettingsSearchPage(viewModel: ChatViewModel, onBack: () -> Unit) {
                                         textAlign = TextAlign.Center
                                     )
                                     DropdownMenu(
-                                        containerColor = MaterialTheme.colorScheme.surfaceContainer,
-                                        tonalElevation = 16.dp,
                                         expanded = expanded,
-                                        onDismissRequest = { expanded = false },
-                                        shape = RoundedCornerShape(12.dp)
+                                        onDismissRequest = { expanded = false }
                                     ) {
                                         val noEmbedding = embeddingModels.isEmpty()
                                         searchMethods.forEach { method ->
@@ -332,11 +326,8 @@ fun SettingsSearchPage(viewModel: ChatViewModel, onBack: () -> Unit) {
                                                     Icon(Icons.Default.MoreVert, contentDescription = stringResource(R.string.options))
                                                 }
                                                 DropdownMenu(
-                                                    containerColor = MaterialTheme.colorScheme.surfaceContainer,
-                                                    tonalElevation = 16.dp,
                                                     expanded = showMenuForModel == model.id,
-                                                    onDismissRequest = { showMenuForModel = null },
-                                                    shape = RoundedCornerShape(12.dp)
+                                                    onDismissRequest = { showMenuForModel = null }
                                                 ) {
                                                     DropdownMenuItem(
                                                         text = { Text(stringResource(R.string.edit)) },
@@ -545,10 +536,7 @@ fun SettingsSearchPage(viewModel: ChatViewModel, onBack: () -> Unit) {
                                     }
                                     DropdownMenu(
                                         expanded = provExpanded,
-                                        onDismissRequest = { provExpanded = false },
-                                        containerColor = MaterialTheme.colorScheme.surfaceContainer,
-                                        shape = RoundedCornerShape(12.dp)
-                                    ) {
+                                        onDismissRequest = { provExpanded = false }) {
                                         embeddingProviders.forEachIndexed { idx, p ->
                                             DropdownMenuItem(
                                                 text = { Text(p.name) },
@@ -614,10 +602,7 @@ fun SettingsSearchPage(viewModel: ChatViewModel, onBack: () -> Unit) {
                                     }
                                     DropdownMenu(
                                         expanded = showRemoteModelDropdown,
-                                        onDismissRequest = { showRemoteModelDropdown = false },
-                                        containerColor = MaterialTheme.colorScheme.surfaceContainer,
-                                        shape = RoundedCornerShape(12.dp)
-                                    ) {
+                                        onDismissRequest = { showRemoteModelDropdown = false }) {
                                         provider.models.forEach { model ->
                                             DropdownMenuItem(
                                                 text = { Text(model) },

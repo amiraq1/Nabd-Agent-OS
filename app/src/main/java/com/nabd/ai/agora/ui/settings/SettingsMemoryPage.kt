@@ -158,11 +158,8 @@ fun SettingsMemoryPage(viewModel: ChatViewModel, onBack: () -> Unit) {
                                                 Icon(Icons.Default.MoreVert, stringResource(R.string.menu), tint = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.5f))
                                             }
                                             DropdownMenu(
-                                                containerColor = MaterialTheme.colorScheme.surfaceContainer,
-                                                tonalElevation = 16.dp,
                                                 expanded = showFileMenu,
-                                                onDismissRequest = { showFileMenu = false },
-                                                shape = RoundedCornerShape(12.dp)
+                                                onDismissRequest = { showFileMenu = false }
                                             ) {
                                                 DropdownMenuItem(
                                                     text = { Text(stringResource(R.string.provider_edit)) },

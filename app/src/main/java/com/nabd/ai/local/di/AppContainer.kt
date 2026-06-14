@@ -42,6 +42,26 @@ class AppContainer(private val context: Context) {
 
     val mtpContainer by lazy { com.nabd.ai.local.mtp_engine.di.NabdContainer(context) }
 
+    // ── PRoot Sandbox (flavor-specific) ─────────────────────────
+    // Resolved via reflection so flavor-specific implementations
+    // (FdroidSandboxManagerFactory / PlaySandboxManagerFactory)
+    // load only when the corresponding source-set is present at build time.
+    val sandboxManagerFactory: com.nabd.ai.agora.sandbox.SandboxManagerFactory? by lazy {
+        try {
+            Class.forName("com.nabd.ai.agora.sandbox.FdroidSandboxManagerFactory")
+                .getDeclaredConstructor(android.content.Context::class.java)
+                .newInstance(context) as com.nabd.ai.agora.sandbox.SandboxManagerFactory
+        } catch (_: Exception) {
+            try {
+                Class.forName("com.nabd.ai.agora.sandbox.PlaySandboxManagerFactory")
+                    .getDeclaredConstructor()
+                    .newInstance() as com.nabd.ai.agora.sandbox.SandboxManagerFactory
+            } catch (_: Exception) {
+                null
+            }
+        }
+    }
+
     val settingsRepository by lazy { SettingsRepository(context) }
     val modelManager by lazy { ModelManager(context) }
     

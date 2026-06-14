@@ -953,8 +953,7 @@ private fun AutoBackupPeriodDropdown(currentHours: Int, onSelect: (Int) -> Unit)
         )
         DropdownMenu(
             expanded = expanded,
-            onDismissRequest = { expanded = false },
-            shape = RoundedCornerShape(16.dp)
+            onDismissRequest = { expanded = false }
         ) {
             periods.forEach { (hours, labelRes) ->
                 DropdownMenuItem(
@@ -988,9 +987,7 @@ private fun AutoDeletePeriodDropdown(currentHours: Int, backupHours: Int, onSele
         )
         DropdownMenu(
             expanded = expanded,
-            onDismissRequest = { expanded = false },
-            shape = RoundedCornerShape(16.dp)
-        ) {
+            onDismissRequest = { expanded = false }) {
             validPeriods.forEach { (hours, labelRes) ->
                 DropdownMenuItem(
                     text = { Text(stringResource(labelRes)) },

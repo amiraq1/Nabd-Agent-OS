@@ -3,16 +3,11 @@ package com.nabd.ai.ui
 import androidx.compose.animation.Crossfade
 import androidx.compose.animation.core.tween
 import androidx.compose.foundation.background
-import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
-import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.runtime.*
-import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.draw.clip
-import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.unit.dp
+import androidx.compose.ui.platform.LocalContext
 import androidx.lifecycle.viewmodel.compose.viewModel
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.ViewModelProvider
@@ -21,19 +16,30 @@ import com.nabd.ai.local.mtp_engine.ui.chat.NabdChatScreen
 import com.nabd.ai.local.ui.ChatViewModel
 import com.nabd.ai.agora.ui.settings.SettingsPage
 import com.nabd.ai.agora.ui.settings.SettingsViewModel
-import androidx.compose.ui.platform.LocalContext
+import com.nabd.ai.agora.ui.provider.ProviderPage
+import com.nabd.ai.agora.ui.provider.ProviderViewModel
+import com.nabd.ai.agora.ui.tools.ToolsPage
+import com.nabd.ai.agora.ui.tools.ToolsViewModel
+import com.nabd.ai.agora.ui.telemetry.TelemetryPage
+import com.nabd.ai.agora.ui.telemetry.TelemetryViewModel
+import com.nabd.ai.agora.ui.generation.GenerationPage
+import com.nabd.ai.agora.ui.generation.GenerationViewModel
+import com.nabd.ai.agora.ui.search.WebSearchConfigPage
+import com.nabd.ai.agora.ui.search.WebSearchConfigViewModel
+import com.nabd.ai.agora.navigation.AppRoute
 import android.app.Application
 import kotlinx.coroutines.launch
 
-sealed class AppRoute {
-    object Chat : AppRoute()
-    object Autonomy : AppRoute()
-    object Settings : AppRoute()
-}
-
 @Composable
 fun AvantGardeAppLayout(appContainer: AppContainer) {
-    var activeRoute by remember { mutableStateOf<AppRoute>(AppRoute.Chat) }
+    var activeRoute by remember { mutableStateOf(AppRoute.Chat) }
+    
+    val dummyNavController = object : androidx.navigation.NavController(LocalContext.current) {
+        override fun popBackStack(): Boolean {
+            activeRoute = AppRoute.Chat
+            return true
+        }
+    }
 
     val chatViewModel: ChatViewModel = viewModel(
         factory = object : ViewModelProvider.Factory {
@@ -50,6 +56,36 @@ fun AvantGardeAppLayout(appContainer: AppContainer) {
         )
     )
 
+    val providerViewModel: ProviderViewModel = viewModel(
+        factory = ProviderViewModel.Factory(
+            app = LocalContext.current.applicationContext as Application
+        )
+    )
+
+    val toolsViewModel: ToolsViewModel = viewModel(
+        factory = ToolsViewModel.Factory(
+            app = LocalContext.current.applicationContext as Application
+        )
+    )
+
+    val telemetryViewModel: TelemetryViewModel = viewModel(
+        factory = TelemetryViewModel.Factory(
+            app = LocalContext.current.applicationContext as Application
+        )
+    )
+
+    val generationViewModel: GenerationViewModel = viewModel(
+        factory = GenerationViewModel.Factory(
+            app = LocalContext.current.applicationContext as Application
+        )
+    )
+
+    val webSearchViewModel: WebSearchConfigViewModel = viewModel(
+        factory = WebSearchConfigViewModel.Factory(
+            app = LocalContext.current.applicationContext as Application
+        )
+    )
+
     Box(
         modifier = Modifier
             .fillMaxSize()
@@ -61,13 +97,16 @@ fun AvantGardeAppLayout(appContainer: AppContainer) {
             label = "RouteTransition"
         ) { route ->
             when (route) {
-                is AppRoute.Chat -> {
+                AppRoute.Chat -> {
                     NabdChatScreen(
                         viewModel = chatViewModel,
-                        onSettingsClick = { activeRoute = AppRoute.Settings }
+                        onSettingsClick = { activeRoute = AppRoute.Settings },
+                        onProviderHubClick = { activeRoute = AppRoute.ProviderHub },
+                        onToolsHubClick = { activeRoute = AppRoute.ToolsHub },
+                        onTelemetryHubClick = { activeRoute = AppRoute.TelemetryHub }
                     )
                 }
-                is AppRoute.Autonomy -> {
+                AppRoute.Autonomy -> {
                     val agentRunner = appContainer.autonomousAgentRunner
                     val timeline = appContainer.executionTimeline
                     
@@ -88,10 +127,40 @@ fun AvantGardeAppLayout(appContainer: AppContainer) {
                         onCancel = { agentRunner.cancel() }
                     )
                 }
-                is AppRoute.Settings -> {
+                AppRoute.Settings -> {
                     SettingsPage(
                         viewModel = settingsViewModel,
                         onBack = { activeRoute = AppRoute.Chat }
+                    )
+                }
+                AppRoute.ProviderHub -> {
+                    ProviderPage(
+                        viewModel = providerViewModel,
+                        onBack = { activeRoute = AppRoute.Chat }
+                    )
+                }
+                AppRoute.ToolsHub -> {
+                    ToolsPage(
+                        navController = dummyNavController,
+                        viewModel = toolsViewModel
+                    )
+                }
+                AppRoute.TelemetryHub -> {
+                    TelemetryPage(
+                        navController = dummyNavController,
+                        viewModel = telemetryViewModel
+                    )
+                }
+                AppRoute.GenerationHub -> {
+                    GenerationPage(
+                        navController = dummyNavController,
+                        viewModel = generationViewModel
+                    )
+                }
+                AppRoute.WebSearchConfigHub -> {
+                    WebSearchConfigPage(
+                        navController = dummyNavController,
+                        viewModel = webSearchViewModel
                     )
                 }
             }

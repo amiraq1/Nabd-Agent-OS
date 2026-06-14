@@ -33,7 +33,10 @@ import com.nabd.ai.local.mtp_engine.ui.components.IntelligenceFlowIndicator
 fun NabdChatScreen(
     viewModel: ChatViewModel,
     modifier: Modifier = Modifier,
-    onSettingsClick: () -> Unit = {}
+    onSettingsClick: () -> Unit = {},
+    onProviderHubClick: () -> Unit = {},
+    onToolsHubClick: () -> Unit = {},
+    onTelemetryHubClick: () -> Unit = {}
 ) {
     val uiState by viewModel.state.collectAsState()
     val listState = rememberLazyListState()
@@ -58,7 +61,10 @@ fun NabdChatScreen(
                 currentModel = uiState.selectedModel,
                 onNewChat = { viewModel.dispatch(NabdAction.ResetConversation) },
                 onMemoryClick = { /* Future: Semantic Memory View */ },
-                onSettingsClick = onSettingsClick
+                onSettingsClick = onSettingsClick,
+                onProviderHubClick = onProviderHubClick,
+                onToolsHubClick = onToolsHubClick,
+                onTelemetryHubClick = onTelemetryHubClick
             ) 
         },
         bottomBar = {
@@ -146,12 +152,17 @@ fun NabdChatScreen(
     }
 }
 
+import androidx.compose.material.icons.filled.Analytics
+
 @Composable
 fun NabdTopAppBar(
     currentModel: String?,
     onNewChat: () -> Unit,
     onMemoryClick: () -> Unit,
-    onSettingsClick: () -> Unit
+    onSettingsClick: () -> Unit,
+    onProviderHubClick: () -> Unit,
+    onToolsHubClick: () -> Unit,
+    onTelemetryHubClick: () -> Unit
 ) {
     Row(
         modifier = Modifier
@@ -171,8 +182,14 @@ fun NabdTopAppBar(
             IconButton(onClick = onNewChat) {
                 Icon(Icons.Default.Add, contentDescription = "New Chat", tint = MaterialTheme.colorScheme.onSurface)
             }
-            IconButton(onClick = onMemoryClick) {
-                Icon(Icons.Default.Memory, contentDescription = "Memory Status", tint = MaterialTheme.colorScheme.onSurface)
+            IconButton(onClick = onProviderHubClick) {
+                Icon(Icons.Default.Memory, contentDescription = "Provider Hub", tint = Color(0xFF00FF66)) // Neon Green microchip
+            }
+            IconButton(onClick = onToolsHubClick) {
+                Icon(Icons.Default.Build, contentDescription = "Tools Hub", tint = MaterialTheme.colorScheme.onSurface)
+            }
+            IconButton(onClick = onTelemetryHubClick) {
+                Icon(Icons.Default.Analytics, contentDescription = "Telemetry Hub", tint = MaterialTheme.colorScheme.onSurface)
             }
         }
 
@@ -194,7 +211,7 @@ fun NabdTopAppBar(
                 Icon(
                     Icons.Default.Settings, 
                     contentDescription = "System Configuration", 
-                    tint = Color(0xFF00FF66), // Neon Green
+                    tint = MaterialTheme.colorScheme.onSurface,
                     modifier = Modifier.size(18.dp)
                 )
             }

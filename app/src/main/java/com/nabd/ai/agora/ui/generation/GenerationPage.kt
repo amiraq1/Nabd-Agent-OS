@@ -43,7 +43,6 @@ import androidx.compose.ui.unit.LayoutDirection
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
-import androidx.navigation.NavController
 import com.nabd.ai.agora.ui.common.SettingsBentoCard
 import kotlin.math.roundToInt
 
@@ -56,8 +55,8 @@ private val SEGMENTED_ACTIVE_BORDER = Color(0xFF00FF66).copy(alpha = 0.4f)
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun GenerationPage(
-    navController: NavController,
     viewModel: GenerationViewModel,
+    onBackClick: () -> Unit,
     modifier: Modifier = Modifier
 ) {
     val contextSize by viewModel.contextWindowSize.collectAsStateWithLifecycle()
@@ -81,7 +80,7 @@ fun GenerationPage(
                         )
                     },
                     navigationIcon = {
-                        IconButton(onClick = { navController.popBackStack() }) {
+                        IconButton(onClick = onBackClick) {
                             Icon(
                                 imageVector = Icons.AutoMirrored.Filled.ArrowBack,
                                 contentDescription = "Back",

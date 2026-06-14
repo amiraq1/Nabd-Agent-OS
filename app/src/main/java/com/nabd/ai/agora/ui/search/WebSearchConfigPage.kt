@@ -48,7 +48,6 @@ import androidx.compose.ui.unit.LayoutDirection
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
-import androidx.navigation.NavController
 import com.nabd.ai.agora.ui.common.SettingsBentoCard
 import kotlin.math.roundToInt
 
@@ -60,8 +59,8 @@ private val BORDER_SUBTLE = Color(0xFF8A94A6).copy(alpha = 0.15f)
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun WebSearchConfigPage(
-    navController: NavController,
     viewModel: WebSearchConfigViewModel,
+    onBackClick: () -> Unit,
     modifier: Modifier = Modifier
 ) {
     val enabled by viewModel.isWebSearchEnabled.collectAsStateWithLifecycle()
@@ -85,7 +84,7 @@ fun WebSearchConfigPage(
                         )
                     },
                     navigationIcon = {
-                        IconButton(onClick = { navController.popBackStack() }) {
+                        IconButton(onClick = onBackClick) {
                             Icon(
                                 imageVector = Icons.AutoMirrored.Filled.ArrowBack,
                                 contentDescription = "Back",

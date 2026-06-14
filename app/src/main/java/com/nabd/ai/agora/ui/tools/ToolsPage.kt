@@ -31,8 +31,6 @@ import androidx.compose.ui.unit.LayoutDirection
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
-import androidx.navigation.NavController
-import com.nabd.ai.agora.navigation.AppRoute
 import kotlinx.coroutines.flow.StateFlow
 
 private val BG_CARD        = Color(0xFF161A23)
@@ -54,8 +52,9 @@ private data class ToolEntry(
 @OptIn(ExperimentalMaterial3Api::class, ExperimentalAnimationApi::class)
 @Composable
 fun ToolsPage(
-    navController: NavController,
     viewModel: ToolsViewModel,
+    onBackClick: () -> Unit,
+    onWebSearchClick: () -> Unit,
     modifier: Modifier = Modifier
 ) {
     val snackbarHostState = remember { SnackbarHostState() }
@@ -77,7 +76,7 @@ fun ToolsPage(
             icon     = Icons.Default.Public,
             isEnabled = viewModel.isWebSearchEnabled,
             onToggle  = viewModel::toggleWebSearch,
-            onClick   = { navController.navigate(AppRoute.WebSearchConfigHub) }
+            onClick   = onWebSearchClick
         ),
         ToolEntry(
             title    = "Conversation Search",
@@ -109,7 +108,7 @@ fun ToolsPage(
                         )
                     },
                     navigationIcon = {
-                        IconButton(onClick = { navController.popBackStack() }) {
+                        IconButton(onClick = onBackClick) {
                             Icon(
                                 imageVector = Icons.AutoMirrored.Filled.ArrowBack,
                                 contentDescription = "Back",

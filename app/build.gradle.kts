@@ -99,6 +99,7 @@ dependencies {
     implementation("androidx.compose.foundation:foundation")
     implementation("androidx.compose.material:material-icons-extended")
     implementation("androidx.compose.ui:ui-text-google-fonts")
+    implementation("androidx.navigation:navigation-compose:2.8.1")
     
     // MaterialKolor for dynamic themes
     implementation("com.materialkolor:material-color-utilities:1.7.0")

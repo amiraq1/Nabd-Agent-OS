@@ -69,7 +69,6 @@ fun GenerationPage(
             containerColor = Color(0xFF0D1117),
             topBar = {
                 TopAppBar(
-                    containerColor = Color(0xFF0D1117),
                     title = {
                         Text(
                             text = "Generation",

@@ -98,6 +98,15 @@ class SettingsRepository private constructor(context: Context) {
         .catch { e -> if (e is IOException) emit(emptyPreferences()) else throw e }
         .map { (it[KEY_MAX_SEARCH_RESULTS] ?: 5).coerceIn(1, 10) }
 
+    /* ── Phase 10 Flows ────────────────────────────────────────── */
+    val activeProvider: Flow<String> = dataStore.data
+        .catch { e -> if (e is IOException) emit(emptyPreferences()) else throw e }
+        .map { it[KEY_ACTIVE_PROVIDER] ?: "OpenAI" }
+
+    val activeModel: Flow<String> = dataStore.data
+        .catch { e -> if (e is IOException) emit(emptyPreferences()) else throw e }
+        .map { it[KEY_ACTIVE_MODEL] ?: "gpt-4o" }
+
     /* ── Mutators ─────────────────────────────────────────────── */
     suspend fun setIsLocalEngine(value: Boolean) {
         dataStore.edit { it[KEY_IS_LOCAL_ENGINE] = value }
@@ -172,6 +181,14 @@ class SettingsRepository private constructor(context: Context) {
         dataStore.edit { it[KEY_MAX_SEARCH_RESULTS] = count.coerceIn(1, 10) }
     }
 
+    suspend fun saveActiveProvider(value: String) {
+        dataStore.edit { it[KEY_ACTIVE_PROVIDER] = value.trim() }
+    }
+
+    suspend fun saveActiveModel(value: String) {
+        dataStore.edit { it[KEY_ACTIVE_MODEL] = value.trim() }
+    }
+
     companion object {
         /* ── Phase 3 Keys ────────────────────────────────────────── */
         private val KEY_IS_LOCAL_ENGINE = booleanPreferencesKey("is_local_engine")
@@ -198,6 +215,10 @@ class SettingsRepository private constructor(context: Context) {
         val KEY_THINKING_LEVEL     = stringPreferencesKey("thinking_level")
         val KEY_BRAVE_SEARCH_KEY   = stringPreferencesKey("brave_search_api_key")
         val KEY_MAX_SEARCH_RESULTS = intPreferencesKey("max_search_results")
+
+        /* ── Phase 10 Keys ───────────────────────────────────────── */
+        val KEY_ACTIVE_PROVIDER = stringPreferencesKey("active_cloud_provider")
+        val KEY_ACTIVE_MODEL    = stringPreferencesKey("active_cloud_model")
 
         @Volatile private var INSTANCE: SettingsRepository? = null
 
